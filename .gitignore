@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Virtual Environment
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Streamlit
+.streamlit/
+
+# Data Files (本地数据不提交)
+*.xlsx
+!工作记录.xlsx
+!任务级数据.xlsx
+*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Config (包含敏感信息本地配置不提交)
+config/ai_config.json
+config/config_hash.txt
+
+# Temp
+tmp/
+temp/
