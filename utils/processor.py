@@ -176,8 +176,6 @@ class WorkRecordProcessor:
                 for t, w in zip(tasks, weights):
                     hours = (w / total_weight) * DAY_HOURS if total_weight else 0
                     problem_desc_raw = row["问题描述"] if pd.notna(row["问题描述"]) else ""
-                    # 根据来源解析对应的问题描述
-                    problem_desc = self.parse_problem_description(problem_desc_raw, source)
                     task_rows.append({
                         "任务ID": f"T{task_id:05d}",
                         "日期": date,
@@ -187,7 +185,7 @@ class WorkRecordProcessor:
                         "线体/设备": self.match_equipment(t),
                         "任务类型": self.match_type(t),
                         "工时": round(hours, 2),
-                        "问题描述": problem_desc if problem_desc else "",
+                        "问题描述": problem_desc_raw,
                         "项目": self.project,
                         "备注": row["备注"],
                     })

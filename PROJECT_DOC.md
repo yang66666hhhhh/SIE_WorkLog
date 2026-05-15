@@ -30,19 +30,21 @@ SIE_WorkLog/
 ├── main.py                   # 数据处理脚本（可独立运行）
 ├── pages/
 │   ├── 1_数据分析.py         # 数据分析页面
-│   └── 2_系统配置.py         # 系统配置页面
+│   ├── 2_系统配置.py         # 系统配置页面
+│   └── 3_测试报告分析.py      # 测试报告分析页面
 ├── utils/
 │   ├── __init__.py
 │   ├── config.py             # 配置管理模块
 │   ├── processor.py          # 数据处理器
 │   ├── analyzer.py          # 规则分析模块
-│   └── ai_analyzer.py       # AI 智能分析模块
+│   ├── ai_analyzer.py       # AI 智能分析模块
+│   └── test_report_processor.py # 测试报告处理器
 ├── config/
 │   ├── equipment.json       # 设备线体配置
 │   ├── task_rules.json      # 任务类型规则
 │   ├── ai_config.json       # AI 配置
 │   └── config_hash.txt      # 配置哈希（检测变更）
-├── .venv/                    # Python 虚拟环境
+├── 每天自动化测试报告/        # 测试报告文件目录
 ├── 工作记录.xlsx              # 原始数据输入
 └── 任务级数据.xlsx           # 处理后数据输出
 ```

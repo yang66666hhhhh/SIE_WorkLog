@@ -440,68 +440,6 @@ with st.expander("查看分析报告", expanded=True):
     st.caption("💡 如需 AI 智能分析，请在系统配置中启用")
 
 # =====================
-# 问题统计
-# =====================
-st.markdown("---")
-st.subheader("📝 问题统计")
-
-if "问题描述" in df.columns:
-    df_with_problems = df[df["问题描述"].astype(str).str.strip().str.len() > 0]
-
-    if len(df_with_problems) > 0:
-        dev_problem_counts = df_with_problems.groupby("线体/设备").size().sort_values(ascending=True)
-        weekly_counts = df_with_problems.groupby(df_with_problems["日期"].dt.isocalendar().week).size()
-
-        col_dev, col_trend = st.columns([1, 1])
-
-        with col_dev:
-            st.markdown("**📊 按设备统计**")
-            if len(dev_problem_counts) > 0:
-                fig_dev = go.Figure(go.Bar(
-                    x=dev_problem_counts.values,
-                    y=dev_problem_counts.index,
-                    orientation="h",
-                    marker_color="#4C78A8",
-                    text=[f"{v} 个问题" for v in dev_problem_counts.values],
-                    textposition="outside"
-                ))
-                fig_dev.update_layout(
-                    height=max(200, 30 * len(dev_problem_counts)),
-                    margin=dict(t=10, b=30, l=100, r=50),
-                    xaxis_title="问题数量",
-                    yaxis=dict(tickfont=dict(size=11))
-                )
-                st.plotly_chart(fig_dev, use_container_width=True, config=get_chart_config())
-            else:
-                st.markdown("<i style='color:#888;'>暂无问题记录</i>", unsafe_allow_html=True)
-
-        with col_trend:
-            st.markdown("**📈 周趋势**")
-            if len(weekly_counts) > 0:
-                fig_trend = go.Figure(go.Scatter(
-                    x=[f"W{w.item()}" for w in weekly_counts.index],
-                    y=weekly_counts.values,
-                    mode="lines+markers",
-                    marker=dict(size=8, color="#F58518"),
-                    line=dict(width=2, color="#F58518"),
-                    text=weekly_counts.values,
-                    hovertemplate="W %{x}<br>%{y} 个问题<extra></extra>"
-                ))
-                fig_trend.update_layout(
-                    height=max(200, 30 * len(weekly_counts)),
-                    margin=dict(t=10, b=30, l=40, r=40),
-                    xaxis_title="",
-                    yaxis_title="问题数量"
-                )
-                st.plotly_chart(fig_trend, use_container_width=True, config=get_chart_config())
-            else:
-                st.markdown("<i style='color:#888;'>暂无趋势数据</i>", unsafe_allow_html=True)
-    else:
-        st.markdown("<i style='color:#888;'>当前筛选范围内没有问题描述记录</i>", unsafe_allow_html=True)
-else:
-    st.info("请重新处理数据以生成问题描述字段")
-
-# =====================
 # 数据明细
 # =====================
 st.markdown("---")

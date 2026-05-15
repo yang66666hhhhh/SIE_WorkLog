@@ -36,12 +36,12 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-c1, c2 = st.columns(2)
+c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown("### 🔍 数据分析")
-    st.write("工时趋势 · 任务分布 · 设备分析 · AI洞察")
-    st.caption("查看工作数据统计、分析图表、智能建议")
+    st.write("工时趋势 · 任务分布 · 设备分析")
+    st.caption("工作数据分析、图表洞察")
     if st.button("进入", key="goto_data", use_container_width=True):
         st.switch_page("pages/1_数据分析.py")
 
@@ -52,5 +52,19 @@ with c2:
     if st.button("进入", key="goto_config", use_container_width=True):
         st.switch_page("pages/2_系统配置.py")
 
+with c3:
+    st.markdown("### 📋 测试报告分析")
+    st.write("自动化测试 · 问题汇总")
+    st.caption("分析现有测试报告")
+    if st.button("进入", key="goto_test", use_container_width=True):
+        st.switch_page("pages/3_测试报告分析.py")
+
+with c4:
+    st.markdown("### 📝 新建报告")
+    st.write("创建报告 · 预览生成")
+    st.caption("新建测试报告文件")
+    if st.button("进入", key="goto_new", use_container_width=True):
+        st.switch_page("pages/4_新建报告.py")
+
 st.markdown("---")
-st.caption("💡 版本 v2.1 | 数据分析 · 智能洞察 · 配置管理")
+st.caption("💡 版本 v2.2 | 数据分析 · 智能洞察 · 配置管理 · 测试报告")
