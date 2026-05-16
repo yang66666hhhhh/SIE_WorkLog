@@ -124,20 +124,35 @@ def parse_time_periods(time_str):
     return periods
 
 
-def generate_report_content(date_str, lines, time_periods, work_order, today_plans,
-                           actual_scenes, processes, problems, todo_item,
-                           test_results, completions, next_plan_scene, next_plan_processes, coordination):
+def format_numbered_items(items):
+    """生成报告中的序号列表。"""
+    return [f"\t{chr(9311 + i)} {item}" for i, item in enumerate(items, 1)]
+
+
+def calculate_time_periods(time_periods):
+    """计算时间段总分钟数和展示文本。"""
     total_minutes = 0
     time_display_parts = []
     for p in time_periods:
         try:
-            start_min = int(p["start"].split(":")[0]) * 60 + int(p["start"].split(":")[1])
-            end_min = int(p["end"].split(":")[0]) * 60 + int(p["end"].split(":")[1])
-            if end_min > start_min:
-                total_minutes += (end_min - start_min)
-            time_display_parts.append(f"{p['start']}-{p['end']}")
-        except:
-            pass
+            start_hour, start_minute = [int(part) for part in p["start"].split(":")]
+            end_hour, end_minute = [int(part) for part in p["end"].split(":")]
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        start_min = start_hour * 60 + start_minute
+        end_min = end_hour * 60 + end_minute
+        if end_min > start_min:
+            total_minutes += end_min - start_min
+        time_display_parts.append(f"{p['start']}-{p['end']}")
+
+    return total_minutes, time_display_parts
+
+
+def generate_report_content(date_str, lines, time_periods, work_order, today_plans,
+                           actual_scenes, processes, problems, todo_item,
+                           test_results, completions, next_plan_scene, next_plan_processes, coordination):
+    total_minutes, time_display_parts = calculate_time_periods(time_periods)
 
     total_hours = total_minutes / 60.0
     time_display = f"{total_hours:.1f}小时（{', '.join(time_display_parts)}）" if time_display_parts else f"{total_hours:.1f}小时"
@@ -149,8 +164,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
         content_parts.append(f"【今日计划】{today_plans[0]}")
     elif len(today_plans) > 1:
         content_parts.append("【今日计划】")
-        for i, item in enumerate(today_plans, 1):
-            content_parts.append(f"\t{chr(9312 + i)} {item}")
+        content_parts.extend(format_numbered_items(today_plans))
     else:
         content_parts.append("【今日计划】")
 
@@ -160,8 +174,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
         content_parts.append(f"【实际场景】{actual_scenes[0]}")
     elif len(actual_scenes) > 1:
         content_parts.append("【实际场景】")
-        for i, item in enumerate(actual_scenes, 1):
-            content_parts.append(f"\t{chr(9312 + i)} {item}")
+        content_parts.extend(format_numbered_items(actual_scenes))
     else:
         content_parts.append("【实际场景】")
 
@@ -171,8 +184,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
         content_parts.append(f"【流程】{processes[0]}")
     elif len(processes) > 1:
         content_parts.append("【流程】")
-        for i, item in enumerate(processes, 1):
-            content_parts.append(f"\t{chr(9312 + i)} {item}")
+        content_parts.extend(format_numbered_items(processes))
     else:
         content_parts.append("【流程】")
 
@@ -196,8 +208,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
         content_parts.append(f"【测试结果】{test_results[0]}")
     elif len(test_results) > 1:
         content_parts.append("【测试结果】")
-        for i, item in enumerate(test_results, 1):
-            content_parts.append(f"\t{chr(9312 + i)} {item}")
+        content_parts.extend(format_numbered_items(test_results))
     else:
         content_parts.append("【测试结果】")
 
@@ -205,8 +216,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
         content_parts.append(f"【今日计划实际是否完成】{completions[0]}")
     elif len(completions) > 1:
         content_parts.append("【今日计划实际是否完成】")
-        for i, item in enumerate(completions, 1):
-            content_parts.append(f"\t{chr(9312 + i)} {item}")
+        content_parts.extend(format_numbered_items(completions))
     else:
         content_parts.append("【今日计划实际是否完成】")
 
@@ -215,8 +225,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
 
     if next_plan_processes:
         content_parts.append("明细流程：")
-        for i, item in enumerate(next_plan_processes, 1):
-            content_parts.append(f"\t{chr(9312 + i)} {item}")
+        content_parts.extend(format_numbered_items(next_plan_processes))
 
     content_parts.append(f"需要协调事项：{coordination if coordination else '无'}")
 
@@ -226,6 +235,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
 def render_report_form(report_data=None, mode="create", original_filename=None):
     is_edit = mode == "edit"
     title = "✏️ 编辑报告" if is_edit else "📝 新建报告"
+    form_key = f"{mode}:{original_filename or 'new'}"
 
     if is_edit and report_data:
         form_data = parse_report_to_form(report_data)
@@ -251,12 +261,16 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
     st.subheader(title)
 
+    if st.session_state.get("report_form_key") != form_key:
+        st.session_state.report_form_key = form_key
+        st.session_state.time_periods = form_data.get("time_periods", [{"start": "09:30", "end": "12:00"}])
+
     col_date, col_lines = st.columns([1, 2])
     with col_date:
         if is_edit and form_data.get("report_date"):
             try:
                 default_date = pd.to_datetime(form_data["report_date"]).date()
-            except:
+            except (TypeError, ValueError):
                 default_date = datetime.now().date()
         else:
             default_date = form_data.get("report_date", datetime.now().date())
@@ -289,17 +303,17 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
         cols = st.columns([4, 1, 4, 1])
         try:
             start_default = datetime.strptime(p.get("start", "09:30"), "%H:%M").time()
-        except:
+        except (TypeError, ValueError):
             start_default = datetime.strptime("09:30", "%H:%M").time()
         try:
             end_default = datetime.strptime(p.get("end", "12:00"), "%H:%M").time()
-        except:
+        except (TypeError, ValueError):
             end_default = datetime.strptime("12:00", "%H:%M").time()
 
         with cols[0]:
-            start_time = st.time_input(f"开始{i}", value=start_default, key=f"time_start_{i}")
+            start_time = st.time_input(f"开始{i}", value=start_default, key=f"{form_key}_time_start_{i}")
         with cols[2]:
-            end_time = st.time_input(f"结束{i}", value=end_time, key=f"time_end_{i}")
+            end_time = st.time_input(f"结束{i}", value=end_time, key=f"{form_key}_time_end_{i}")
         with cols[3]:
             if len(time_periods) > 1 and st.button("❌", key=f"del_time_{i}", help="删除"):
                 st.session_state.time_periods.pop(i)
@@ -312,17 +326,7 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
     time_periods = new_periods
 
-    total_minutes = 0
-    time_display_parts = []
-    for p in time_periods:
-        try:
-            start_min = int(p["start"].split(":")[0]) * 60 + int(p["start"].split(":")[1])
-            end_min = int(p["end"].split(":")[0]) * 60 + int(p["end"].split(":")[1])
-            if end_min > start_min:
-                total_minutes += (end_min - start_min)
-            time_display_parts.append(f"{p['start']}-{p['end']}")
-        except:
-            pass
+    total_minutes, time_display_parts = calculate_time_periods(time_periods)
 
     total_hours = total_minutes / 60.0
     time_display = ", ".join(time_display_parts)
@@ -491,6 +495,7 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
                 file_path = REPORT_DIR / save_filename
                 try:
+                    REPORT_DIR.mkdir(exist_ok=True)
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(content)
 

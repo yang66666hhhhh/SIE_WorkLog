@@ -4,7 +4,7 @@
 
 基于 Python 的工作记录数据分析系统，将原始 Excel 日志转化为任务级数据模型，提供交互式 BI 分析与自动洞察能力。
 
-**项目路径**: `C:\Users\Yang\Desktop\MyProject\SIE_WorkLog`
+**项目路径**: `D:\03_Projects\Work\SIE_WorkLog`
 
 ---
 
@@ -13,12 +13,12 @@
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Python | 3.14 | 主语言 |
-| Pandas | - | 数据处理 |
-| NumPy | - | 数值计算 |
-| Streamlit | - | Web UI 框架 |
-| Plotly | - | 图表可视化 |
-| openpyxl | - | Excel 读写 |
-| openai | - | AI 分析（可选） |
+| Pandas | 2.0+ | 数据处理 |
+| NumPy | 1.24+ | 数值计算 |
+| Streamlit | 1.30+ | Web UI 框架 |
+| Plotly | 5.15+ | 图表可视化 |
+| openpyxl | 3.1+ | Excel 读写 |
+| openai | 1.0+ | AI 分析（可选） |
 
 ---
 
@@ -29,24 +29,30 @@ SIE_WorkLog/
 ├── dashboard.py              # 首页入口
 ├── main.py                   # 数据处理脚本（可独立运行）
 ├── pages/
-│   ├── 1_数据分析.py         # 数据分析页面
-│   ├── 2_系统配置.py         # 系统配置页面
-│   └── 3_测试报告分析.py      # 测试报告分析页面
+│   ├── 1_数据分析.py         # 数据分析页面（优化版）
+│   ├── 3_测试报告分析.py     # 测试报告分析（优化版）
+│   ├── 4_新建报告.py         # 新建测试报告
+│   └── 5_系统配置.py         # 系统配置（优化版）
 ├── utils/
 │   ├── __init__.py
-│   ├── config.py             # 配置管理模块
-│   ├── processor.py          # 数据处理器
+│   ├── config.py             # 配置管理模块（重构版）
+│   ├── processor.py          # 数据处理器（重构版）
 │   ├── analyzer.py          # 规则分析模块
 │   ├── ai_analyzer.py       # AI 智能分析模块
+│   ├── charts.py            # 图表模块（新增）
+│   ├── report_form.py       # 报告表单（修复版）
 │   └── test_report_processor.py # 测试报告处理器
 ├── config/
 │   ├── equipment.json       # 设备线体配置
 │   ├── task_rules.json      # 任务类型规则
 │   ├── ai_config.json       # AI 配置
-│   └── config_hash.txt      # 配置哈希（检测变更）
-├── 每天自动化测试报告/        # 测试报告文件目录
+│   ├── config_hash.txt      # 配置哈希（检测变更）
+│   └── project.json        # 项目配置（新增）
+├── .venv/                    # Python 虚拟环境
 ├── 工作记录.xlsx              # 原始数据输入
-└── 任务级数据.xlsx           # 处理后数据输出
+├── 任务级数据.xlsx           # 处理后数据输出
+├── requirements.txt         # 依赖管理（新增）
+└── report/                  # 测试报告存储（新增）
 ```
 
 ---
@@ -62,6 +68,7 @@ SIE_WorkLog/
 | 设备识别 | 基于关键词匹配设备线体（支持多关键词） |
 | 任务分类 | 基于正则规则自动分类（调试/配置/学习/分析/其他） |
 | 问题描述 | 支持 MSAP/HDI 来源标识的问题记录 |
+| 项目配置 | 项目名称可配置（新增） |
 
 ### 2. 数据分析 Dashboard
 
@@ -76,21 +83,34 @@ SIE_WorkLog/
 | 问题统计 | 按设备统计问题数量 + 周趋势折线图 |
 | AI 智能分析 | 5大维度自动洞察（健康度、设备异常、任务诊断、趋势、建议） |
 | Drill Down | 按日期/设备/类型/来源查看明细 |
-| 数据明细 | 可排序表格，支持 CSV 导出 |
+| 数据明细 | 可排序表格，支持 CSV/Excel 导出 |
+| 任务类型筛选 | 新增侧边栏筛选器 |
 
 ### 3. 系统配置
 
 | 功能 | 说明 |
 |------|------|
 | 设备线体管理 | 增删改查，支持关键词配置 |
-| 任务类型规则 | 增删改查，支持正则表达式 |
+| 任务类型规则 | 增删改查，支持正则表达式校验 |
 | AI 配置 | 选择模型、填写 API Key、启用/禁用 |
 | 配置备份/恢复 | JSON 文件导出/导入 |
+| 项目名称配置 | 新增项目名称管理 |
+| API Key 加密 | 安全存储敏感信息 |
 
-### 4. 首页
+### 4. 测试报告系统
+
+| 功能 | 说明 |
+|------|------|
+| 报告创建 | 通过表单创建测试报告 |
+| 报告分析 | 问题统计、趋势分析、状态分布 |
+| 多维度筛选 | 日期、线体、状态多条件筛选 |
+| 问题详情 | 按部门、日期分组显示问题 |
+| 报告编辑 | 支持编辑现有报告 |
+
+### 5. 首页
 
 - 卡片式布局展示功能入口
-- 快捷按钮跳转到数据分析/系统配置
+- 快捷按钮跳转到数据分析/测试报告/系统配置
 - 渐变色按钮增强视觉体验
 
 ---
@@ -100,16 +120,16 @@ SIE_WorkLog/
 ### 1. 安装依赖
 
 ```powershell
-pip install pandas numpy streamlit plotly openpyxl openai
+pip install -r requirements.txt
 ```
 
 ### 2. 启动应用
 
 ```powershell
 # 进入项目目录
-cd C:\Users\Yang\Desktop\MyProject\SIE_WorkLog
+cd D:\03_Projects\Work\SIE_WorkLog
 
-# 激活虚拟环境
+# 激活虚拟环境（如果使用）
 .\.venv\Scripts\Activate.ps1
 
 # 启动 Dashboard
@@ -155,7 +175,7 @@ python main.py
 | 线体/设备 | 匹配的设备名称 |
 | 任务类型 | 调试/配置/学习/分析/其他 |
 | 工时 | 分配后工时（小时） |
-| 问题描述 | 工作问题记录 |
+| 问题描述 | 工作问题记录（按来源拆分） |
 | 项目 | 项目名称 |
 | 备注 | 原始备注 |
 | 月份 | YYYY-MM 格式 |
@@ -163,6 +183,14 @@ python main.py
 | 是否周末 | True/False |
 | 日总工时 | 当天所有任务总工时 |
 | 任务占比 | 单任务工时/日总工时 |
+
+### 测试报告格式
+
+测试报告存储在 `report/` 目录下，支持 `.txt` 格式，包含：
+- 日期、线体、工单等信息
+- 测试总时长
+- 问题汇总
+- 状态记录
 
 ---
 
@@ -179,7 +207,8 @@ python main.py
   "安美特PLB": ["plb", "安美特"],
   "LDD棕化线（HDI）": ["ldd棕化线（hdi）", "hdi"],
   "LDD棕化线（MSAP）": ["ldd棕化线（msap）", "msap", "撕铜箔"],
-  "LDD去棕化（MSAP）": ["ldd去棕化（msap）", "去棕化MSAP"]
+  "LDD去棕化（MSAP）": ["ldd去棕化（msap）", "去棕化MSAP"],
+  "AOS": ["AOS"]
 }
 ```
 
@@ -189,8 +218,10 @@ python main.py
 {
   "学习": "学习|培训",
   "调试": "调试|联调|测试|异常|问题",
-  "配置": "配置|搭建",
-  "分析": "分析|整理|梳理"
+  "配置": "配置|搭建|数据采集",
+  "分析": "分析|整理|梳理",
+  "协助": "协助",
+  "培训": "培训"
 }
 ```
 
@@ -199,10 +230,18 @@ python main.py
 ```json
 {
   "provider": "openai",
-  "api_key": "your-api-key",
+  "api_key": "enc_YourObfuscatedKey_...",
   "base_url": "https://api.openai.com/v1",
   "model": "gpt-3.5-turbo",
   "enabled": false
+}
+```
+
+### 项目配置 (config/project.json)
+
+```json
+{
+  "project_name": "胜宏科技HDI二处工业物联网平台实施项目2026"
 }
 ```
 
@@ -238,12 +277,26 @@ python main.py
 4. **配置热更新**: 修改配置后自动重新处理数据
 5. **问题追踪**: 支持问题描述记录，便于分析设备故障规律
 6. **交互优化**: 侧边栏筛选、折叠面板、图表导出
+7. **模块化架构**: 图表、配置、处理器模块化设计
+8. **安全存储**: API Key 加密存储
+9. **性能优化**: 缓存机制减少重复计算
+10. **测试报告**: 完整的测试报告管理和分析系统
 
 ---
 
 ## 更新日志
 
-### v2.1 (当前版本)
+### v2.2 (当前版本)
+- 优化测试报告分析界面
+- 添加项目名称配置
+- 任务类型配置正则校验
+- 优化数据上传校验
+- 添加 requirements.txt
+- 模块化图表组件
+- 缓存优化减少重复计算
+- 响应式 UI 设计
+
+### v2.1
 - 新增 AI 分析模块 (`utils/analyzer.py`)
 - 重构问题统计（按设备 + 周趋势）
 - 优化筛选器（折叠面板 + 动态默认值）
@@ -269,12 +322,19 @@ python main.py
 | `dashboard.py` | 首页入口 |
 | `main.py` | 独立数据处理脚本 |
 | `pages/1_数据分析.py` | 数据分析页面 |
-| `pages/2_系统配置.py` | 系统配置页面 |
+| `pages/3_测试报告分析.py` | 测试报告分析页面 |
+| `pages/4_新建报告.py` | 新建测试报告 |
+| `pages/5_系统配置.py` | 系统配置页面 |
 | `utils/config.py` | 配置管理模块 |
 | `utils/processor.py` | 数据处理器 |
 | `utils/analyzer.py` | 规则分析模块 |
 | `utils/ai_analyzer.py` | AI 分析模块 |
+| `utils/charts.py` | 图表模块 |
+| `utils/report_form.py` | 报告表单模块 |
+| `utils/test_report_processor.py` | 测试报告处理器 |
 | `config/equipment.json` | 设备线体配置 |
 | `config/task_rules.json` | 任务类型规则 |
 | `config/ai_config.json` | AI 配置 |
+| `config/project.json` | 项目配置 |
 | `PROJECT_DOC.md` | 项目文档 |
+| `requirements.txt` | 依赖管理 |
