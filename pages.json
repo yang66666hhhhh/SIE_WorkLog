@@ -1,0 +1,29 @@
+{
+    "report": [
+        {
+            "title": "📈 数据分析",
+            "icon": "📈",
+            "page": "pages/1_数据分析.py",
+            "description": "工时趋势 · 任务分布 · 设备分析"
+        },
+
+        {
+            "title": "📋 测试报告分析",
+            "icon": "📋",
+            "page": "pages/3_测试报告分析.py",
+            "description": "自动化测试 · 问题汇总"
+        },
+        {
+            "title": "📝 新建报告",
+            "icon": "📝",
+            "page": "pages/4_新建报告.py",
+            "description": "创建报告 · 预览生成"
+        },
+		        {
+            "title": "⚙️ 系统配置",
+            "icon": "⚙️",
+            "page": "pages/2_系统配置.py",
+            "description": "设备线体 · 任务类型 · AI配置"
+        }
+    ]
+}

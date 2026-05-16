@@ -4,11 +4,11 @@ from pathlib import Path
 
 
 class TestReportProcessor:
-    """自动化测试报告处理器 - 新版"""
+    """自动化测试报告处理器 - 新版格式"""
 
     REPORT_DIR = Path("report")
 
-    LINE_TYPES = ["VCP1", "VCP2", "PLB"]
+    CATEGORIES = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"]
 
     def __init__(self, report_dir=None):
         if report_dir:
@@ -20,206 +20,48 @@ class TestReportProcessor:
 
         result = {
             "文件名": file_path.name,
-            "日期": self._extract_date(file_path.name),
+            "日期": self._extract_date(content),
             "线体": self._extract_line_from_filename(file_path.name),
-            "可测试时间": self._extract_test_time(content),
-            "明细时间段": self._extract_time_detail(content),
-            "测试结果": self._extract_test_result(content),
-            "计划完成情况": self._extract_plan_completion(content),
-            "明日/下周计划": self._extract_next_plan(content),
+            "今日计划": self._extract_field(content, "今日计划"),
+            "测试总时长": self._extract_field(content, "测试总时长"),
+            "实际场景": self._extract_field(content, "实际场景"),
+            "工单": self._extract_field(content, "工单"),
+            "流程": self._extract_field(content, "流程"),
+            "问题汇总": self._extract_field(content, "问题汇总"),
+            "待办项": self._extract_field(content, "待办项"),
+            "测试结果": self._extract_field(content, "测试结果"),
+            "计划完成情况": self._extract_field(content, "今日计划实际是否完成"),
+            "明日计划": self._extract_field(content, "明日计划"),
             "需要协调事项": self._extract_coordination(content),
         }
 
-        result["问题列表"] = self._extract_problems(content, result["线体"])
+        result["问题列表"] = self._extract_problems_new(content, result["线体"])
 
         return result
 
-    def _extract_date(self, filename: str) -> str:
-        """提取日期，从文件名提取，格式：2026-05-12 或 05.12"""
-        match = re.search(r"(\d{4})-(\d{2})-(\d{2})", filename)
+    def _extract_date(self, content: str) -> str:
+        """提取日期"""
+        match = re.search(r"【日期】(\d{4}-\d{2}-\d{2})", content)
         if match:
-            return f"{match.group(1)}.{match.group(2)}.{match.group(3)}"
-        match = re.search(r"(\d+)\.(\d+)", filename)
-        if match:
-            return f"2026.{int(match.group(1)):02d}.{int(match.group(2)):02d}"
+            return match.group(1)
         return ""
 
     def _extract_line_from_filename(self, filename: str) -> str:
-        """从文件名提取线体，格式：vcp1_vcp2_plb"""
+        """从文件名提取线体"""
         filename_upper = filename.upper()
         lines = []
-        if "VCP1" in filename_upper:
-            lines.append("VCP1")
-        if "VCP2" in filename_upper:
-            lines.append("VCP2")
-        if "PLB" in filename_upper:
-            lines.append("PLB")
+        for line in ["VCP1", "VCP2", "PLB"]:
+            if line in filename_upper:
+                lines.append(line)
         return ", ".join(lines) if lines else "其他"
 
-    def _extract_test_time(self, content: str) -> float:
-        """提取可测试时间"""
-        match = re.search(r"【生产线可测试时间总计：(\d+\.?\d*)小时】", content)
+    def _extract_field(self, content: str, field_name: str) -> str:
+        """提取字段内容"""
+        pattern = rf"【{field_name}】([\s\S]*?)(?=【|$)"
+        match = re.search(pattern, content)
         if match:
-            return float(match.group(1))
-        return 0.0
-
-    def _extract_time_detail(self, content: str) -> str:
-        """提取明细时间段"""
-        match = re.search(r"明细时间段：(.+)", content)
-        if match:
-            return match.group(1).strip()
-        return ""
-
-    def _extract_problems(self, content: str, line_type_from_filename: str) -> list:
-        """提取问题列表，返回结构化问题数据"""
-        problems = []
-        match = re.search(r"【问题汇总】([\s\S]*?)(?=【测试结果】|【今日计划实际是否完成】|【明日的测试计划】|【下周的测试计划】|$)", content)
-        if not match:
-            return problems
-
-        problem_block = match.group(1)
-        lines = problem_block.split("\n")
-
-        categories = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）",
-                      "生产/工艺", "生产", "工艺", "维护", "IT", "待办项"]
-
-        def is_category_line(line):
-            for cat in categories:
-                if line.startswith(cat):
-                    return True, cat
-            return False, None
-
-        def clean_text(text):
-            text = re.sub(r"^\d+[.)、]\s*", "", text)
-            return text.strip()
-
-        current_source = None
-        pending_texts = []
-
-        for line in lines:
-            stripped = line.strip()
-            is_cat, cat_name = is_category_line(stripped)
-
-            if is_cat:
-                if current_source and pending_texts:
-                    combined = "\n".join(pending_texts).strip()
-                    status = self._extract_status(combined) if combined != "无" else "无"
-                    if not (current_source == "其他" and status == "无"):
-                        problems.append({
-                            "线体": line_type_from_filename,
-                            "来源": current_source,
-                            "原始描述": combined,
-                            "状态": status
-                        })
-                    pending_texts = []
-
-                colon_pos = stripped.find("：")
-                if colon_pos == -1:
-                    colon_pos = stripped.find(":")
-
-                if colon_pos != -1:
-                    text_after = stripped[colon_pos+1:].strip()
-                    current_source = cat_name
-                    if text_after:
-                        pending_texts = [clean_text(text_after)]
-                    else:
-                        pending_texts = []
-                else:
-                    current_source = cat_name
-                    pending_texts = []
-
-            elif line.startswith("\t") or line.startswith("  "):
-                cleaned = clean_text(stripped)
-                if cleaned:
-                    pending_texts.append(cleaned)
-
-            elif stripped.startswith("①") or stripped.startswith("②") or stripped.startswith("③") or stripped.startswith("④") or stripped.startswith("⑤"):
-                if current_source and pending_texts:
-                    combined = "\n".join(pending_texts).strip()
-                    status = self._extract_status(combined) if combined != "无" else "无"
-                    if not (current_source == "其他" and status == "无"):
-                        problems.append({
-                            "线体": line_type_from_filename,
-                            "来源": current_source,
-                            "原始描述": combined,
-                            "状态": status
-                        })
-                current_source = "其他"
-                pending_texts = [clean_text(stripped)]
-
-            else:
-                if current_source and pending_texts:
-                    combined = " ".join(pending_texts).strip()
-                    status = self._extract_status(combined) if combined != "无" else "无"
-                    if not (current_source == "其他" and status == "无"):
-                        problems.append({
-                            "线体": line_type_from_filename,
-                            "来源": current_source,
-                            "原始描述": combined,
-                            "状态": status
-                        })
-                current_source = "其他"
-                pending_texts = [clean_text(stripped)] if stripped and stripped != "无" else []
-
-        if current_source and pending_texts:
-            combined = "\n".join(pending_texts).strip()
-            status = self._extract_status(combined) if combined != "无" else "无"
-            if not (current_source == "其他" and status == "无"):
-                problems.append({
-                    "线体": line_type_from_filename,
-                    "来源": current_source,
-                    "原始描述": combined,
-                    "状态": status
-                })
-
-        return problems
-
-    def _extract_line_type(self, text: str) -> str:
-        """从问题描述中提取线体"""
-        text_upper = text.upper()
-        found = []
-        if "VCP1" in text_upper:
-            found.append("VCP1")
-        if "VCP2" in text_upper:
-            found.append("VCP2")
-        if "PLB" in text_upper:
-            found.append("PLB")
-        return ", ".join(found) if found else "通用"
-
-    def _extract_status(self, text: str) -> str:
-        """从问题描述中提取状态"""
-        if "已解决" in text or "已完成" in text or "已修复" in text:
-            return "已解决"
-        elif "排查" in text or "正在排查" in text:
-            return "排查中"
-        elif "待" in text or "尚未" in text or "未完成" in text:
-            return "待处理"
-        elif "无法" in text or "无心" in text or "无变化" in text:
-            return "待处理"
-        elif text.strip() == "无" or text == "无":
-            return "无"
-        else:
-            return "待处理"
-
-    def _extract_test_result(self, content: str) -> str:
-        """提取测试结果"""
-        match = re.search(r"【测试结果】\s*([\s\S]*?)(?=【今日计划实际是否完成】|【明日的测试计划】|【下周的测试计划】|$)", content)
-        if match:
-            return match.group(1).strip()
-        return ""
-
-    def _extract_plan_completion(self, content: str) -> str:
-        """提取计划完成情况"""
-        match = re.search(r"【今日计划实际是否完成】\s*([\s\S]*?)(?=【明日的测试计划】|【下周的测试计划】|$)", content)
-        if match:
-            return match.group(1).strip()
-        return ""
-
-    def _extract_next_plan(self, content: str) -> str:
-        """提取明日/下周计划"""
-        match = re.search(r"(【明日的测试计划】|【下周的测试计划】)\s*([\s\S]*?)(?=需要协调事项|$)", content, re.DOTALL)
-        if match:
-            return match.group(2).strip()
+            result = match.group(1)
+            return result.strip() if result else ""
         return ""
 
     def _extract_coordination(self, content: str) -> str:
@@ -228,6 +70,107 @@ class TestReportProcessor:
         if match:
             return match.group(1).strip()
         return "无"
+
+    def _extract_problems_new(self, content: str, line_type: str) -> list:
+        """提取问题列表（新版格式）"""
+        problems = []
+        problem_section = self._extract_field(content, "问题汇总")
+        if not problem_section:
+            return problems
+
+        lines = problem_section.split("\n")
+        i = 0
+        current_module = None
+        pending_texts = []
+
+        def save_problem():
+            nonlocal current_module, pending_texts
+            if not current_module or not pending_texts:
+                return
+            combined = "\n".join(pending_texts).strip()
+            if combined and combined != "无":
+                problems.append({
+                    "线体": line_type,
+                    "来源": current_module,
+                    "原始描述": combined,
+                    "状态": self._extract_status(combined)
+                })
+            pending_texts = []
+
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.strip()
+
+            if not stripped:
+                i += 1
+                continue
+
+            tab_count = line.count('\t')
+
+            if tab_count >= 2:
+                pending_texts.append(stripped)
+            elif tab_count == 1:
+                if "：" in stripped or ":" in stripped:
+                    colon_pos = stripped.find("：")
+                    if colon_pos == -1:
+                        colon_pos = stripped.find(":")
+                    if colon_pos > 0:
+                        module_name = stripped[:colon_pos].strip()
+                        text_after = stripped[colon_pos+1:].strip()
+                        save_problem()
+                        current_module = module_name
+                        if text_after and text_after != "无":
+                            pending_texts = [text_after]
+                        else:
+                            pending_texts = []
+                else:
+                    pending_texts.append(stripped)
+            else:
+                if stripped.startswith(("①", "②", "③", "④", "⑤")):
+                    if current_module and pending_texts:
+                        combined = "\n".join(pending_texts).strip()
+                        if combined and combined != "无":
+                            save_problem()
+                    current_module = "其他"
+                    pending_texts = [stripped]
+                else:
+                    save_problem()
+                    if "：" in stripped or ":" in stripped:
+                        colon_pos = stripped.find("：")
+                        if colon_pos == -1:
+                            colon_pos = stripped.find(":")
+                        if colon_pos > 0:
+                            module_name = stripped[:colon_pos].strip()
+                            text_after = stripped[colon_pos+1:].strip()
+                            current_module = module_name
+                            if text_after and text_after != "无":
+                                pending_texts = [text_after]
+                            else:
+                                pending_texts = []
+                        else:
+                            current_module = stripped
+                            pending_texts = []
+                    else:
+                        current_module = stripped
+                        pending_texts = []
+            i += 1
+
+        save_problem()
+        return problems
+
+    def _extract_status(self, text: str) -> str:
+        """从问题描述中提取状态"""
+        if not text or text == "无":
+            return "无"
+
+        if any(k in text for k in ["已解决", "已完成", "已修复", "✅"]):
+            return "已解决"
+        if any(k in text for k in ["正在排查", "🔍"]):
+            return "排查中"
+        if any(k in text for k in ["待验证", "待调整", "待排查", "待确认", "待跟进", "⚠️", "🔁", "❌", "🛑", "待", "尚未", "未完成", "未测试", "占用", "阻塞"]):
+            return "待处理"
+
+        return "待处理"
 
     def process_all(self) -> pd.DataFrame:
         """处理所有报告"""
@@ -258,14 +201,13 @@ class TestReportProcessor:
         for _, row in df.iterrows():
             date = row.get("日期", "")
             for prob in row.get("问题列表", []):
-                if prob.get("状态") != "无":
-                    rows.append({
-                        "日期": date,
-                        "线体": prob.get("线体", ""),
-                        "来源": prob.get("来源", "其他"),
-                        "原始描述": prob.get("原始描述", ""),
-                        "状态": prob.get("状态", "")
-                    })
+                rows.append({
+                    "日期": date,
+                    "线体": prob.get("线体", ""),
+                    "来源": prob.get("来源", "其他"),
+                    "原始描述": prob.get("原始描述", ""),
+                    "状态": prob.get("状态", "")
+                })
 
         return pd.DataFrame(rows)
 
@@ -284,7 +226,7 @@ class TestReportProcessor:
         investigating = len(problems_df[problems_df["状态"] == "排查中"])
 
         by_line = {}
-        for line in self.LINE_TYPES:
+        for line in ["VCP1", "VCP2", "PLB"]:
             line_df = problems_df[problems_df["线体"].str.contains(line, na=False)]
             by_line[line] = {
                 "total": len(line_df),
@@ -311,13 +253,11 @@ class TestReportProcessor:
             return pd.DataFrame()
 
         daily = problems_df.groupby("日期").size().reset_index(name="问题数")
-        daily_resolved = problems_df[problems_df["状态"] == "已解决"].groupby("日期").size().reset_index(name="已解决数")
-        daily_pending = problems_df[problems_df["状态"] == "待处理"].groupby("日期").size().reset_index(name="待处理数")
-        daily_investigating = problems_df[problems_df["状态"] == "排查中"].groupby("日期").size().reset_index(name="排查中数")
+        daily_r = problems_df[problems_df["状态"] == "已解决"].groupby("日期").size().reset_index(name="已解决数")
+        daily_p = problems_df[problems_df["状态"] == "待处理"].groupby("日期").size().reset_index(name="待处理数")
 
-        result = daily.merge(daily_resolved, on="日期", how="left")
-        result = result.merge(daily_pending, on="日期", how="left")
-        result = result.merge(daily_investigating, on="日期", how="left")
+        result = daily.merge(daily_r, on="日期", how="left")
+        result = result.merge(daily_p, on="日期", how="left")
         result = result.fillna(0)
 
         return result
