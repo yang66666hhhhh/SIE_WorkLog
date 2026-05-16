@@ -4,7 +4,6 @@ from typing import List, Dict, Any
 
 
 class AIAnalyzer:
-    """AI 数据分析器"""
 
     SYSTEM_PROMPT = """你是一个专业的工作数据分析助手。根据用户提供的工时数据统计信息，提供简洁、有价值的分析洞察。
 
@@ -25,21 +24,19 @@ class AIAnalyzer:
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
+        self._client = None
         if api_key:
-            openai.api_key = api_key
-            if base_url:
-                openai.api_base = base_url
+            self._client = openai.OpenAI(api_key=api_key, base_url=base_url or None)
 
     def generate_summary(self, df: pd.DataFrame) -> str:
-        """生成数据分析总结"""
-        if not self.api_key:
+        if not self.api_key or not self._client:
             return self._rule_based_insights(df)
 
         try:
             stats = self._calculate_stats(df)
             user_prompt = self._build_prompt(stats)
 
-            response = openai.ChatCompletion.create(
+            response = self._client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.SYSTEM_PROMPT},

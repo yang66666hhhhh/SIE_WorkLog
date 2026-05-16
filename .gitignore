@@ -33,6 +33,10 @@ Thumbs.db
 # Config (包含敏感信息本地配置不提交)
 config/ai_config.json
 config/config_hash.txt
+config/project.json
+
+# Report data
+report/
 
 # Temp
 tmp/

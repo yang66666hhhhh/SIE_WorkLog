@@ -5,14 +5,14 @@ import logging
 from pathlib import Path
 from utils.config import Config
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class WorkRecordProcessor:
 
     def __init__(self):
         self.config = Config()
-        self.project = "胜宏科技HDI二处工业物联网平台实施项目2026"
+        self.project = self.config.load_project_name()
 
         raw_rules = self.config.load_task_rules()
         self.task_rules = {k: re.compile(v) for k, v in raw_rules.items()}
@@ -85,53 +85,24 @@ class WorkRecordProcessor:
                 return t
         return "其他"
 
-    def parse_problem_description(self, text, source):
-        """解析问题描述，格式如：MSAP：xxx；HDI：xxx"""
-        if not isinstance(text, str) or not text.strip():
-            return None
+    def extract_problem_for_source(self, problem_desc, source):
+        if not isinstance(problem_desc, str) or not problem_desc.strip():
+            return ""
 
-        text = text.strip()
-
-        # 根据来源确定匹配的模式
-        if "MSAP" in source:
+        source_upper = source.upper()
+        if "MSAP" in source_upper:
             pattern = r"MSAP[：:]\s*(.*?)(?:；|;|$)"
-        elif "HDI" in source:
+        elif "HDI" in source_upper:
             pattern = r"HDI[：:]\s*(.*?)(?:；|;|$)"
         else:
-            return None
+            return problem_desc.strip()
 
-        match = re.search(pattern, text, re.DOTALL)
+        match = re.search(pattern, problem_desc, re.DOTALL)
         if match:
             desc = match.group(1).strip()
-            return desc if desc else None
+            return desc if desc else ""
 
-        # 如果没有 MSAP/HDI 前缀，但有内容，返回整个文本
-        return text if text else None
-
-    def parse_all_problems(self, problem_desc):
-        """解析所有问题描述，返回 [(来源, 问题), ...] 列表"""
-        if not isinstance(problem_desc, str) or not problem_desc.strip():
-            return []
-
-        problems = []
-        # 按分号分割（支持中英文）
-        parts = re.split(r'[；;]', problem_desc)
-        for part in parts:
-            part = part.strip()
-            if not part:
-                continue
-            # 匹配 MSAP 或 HDI 前缀
-            match = re.match(r'(MSAP|HDI)[：:]\s*(.+)', part)
-            if match:
-                source = match.group(1)
-                desc = match.group(2).strip()
-                # 规范化为标准来源名称
-                if source == "HDI":
-                    source = "HDI二处"
-                if desc:
-                    problems.append((source, desc))
-            # 没有前缀的内容不计入统计（只有在问题描述明确标注了来源才统计）
-        return problems
+        return problem_desc.strip()
 
     def task_weight(self, text):
         text = str(text)
@@ -160,6 +131,8 @@ class WorkRecordProcessor:
 
         for _, row in df.iterrows():
             date = row["日期"]
+            problem_desc_raw = row["问题描述"] if pd.notna(row["问题描述"]) else ""
+
             for col in self.work_columns:
                 content = row[col]
                 if pd.isna(content) or not isinstance(content, str) or not content.strip():
@@ -173,9 +146,10 @@ class WorkRecordProcessor:
                 weights = [self.task_weight(t) for t in tasks]
                 total_weight = sum(weights)
 
+                problem_for_source = self.extract_problem_for_source(problem_desc_raw, source)
+
                 for t, w in zip(tasks, weights):
                     hours = (w / total_weight) * DAY_HOURS if total_weight else 0
-                    problem_desc_raw = row["问题描述"] if pd.notna(row["问题描述"]) else ""
                     task_rows.append({
                         "任务ID": f"T{task_id:05d}",
                         "日期": date,
@@ -185,7 +159,7 @@ class WorkRecordProcessor:
                         "线体/设备": self.match_equipment(t),
                         "任务类型": self.match_type(t),
                         "工时": round(hours, 2),
-                        "问题描述": problem_desc_raw,
+                        "问题描述": problem_for_source,
                         "项目": self.project,
                         "备注": row["备注"],
                     })
@@ -193,7 +167,7 @@ class WorkRecordProcessor:
 
         df_task = pd.DataFrame(task_rows)
         if df_task.empty:
-            logging.warning("未生成任何任务，请检查输入数据")
+            logger.warning("未生成任何任务，请检查输入数据")
             return df_task
 
         df_task["月份"] = df_task["日期"].dt.to_period("M").astype(str)
@@ -207,5 +181,5 @@ class WorkRecordProcessor:
         df_task = df_task.sort_values(["日期", "任务ID"])
         df_task.to_excel(output_file, index=False)
 
-        logging.info(f"完成，生成 {len(df_task)} 条任务（来源：{', '.join(self.work_columns)}）")
+        logger.info(f"完成，生成 {len(df_task)} 条任务（来源：{', '.join(self.work_columns)}）")
         return df_task

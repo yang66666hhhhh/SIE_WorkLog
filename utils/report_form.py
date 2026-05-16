@@ -1,4 +1,5 @@
 """报告表单共享模块"""
+import re
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -104,10 +105,8 @@ def parse_report_to_form(report_data):
 
 
 def parse_time_periods_from_duration(duration_str):
-    """从'6小时（09:30-12:00, 14:30-18:00）'格式解析时间段"""
     if not duration_str:
         return []
-    import re
     matches = re.findall(r'(\d{2}:\d{2})-(\d{2}:\d{2})', duration_str)
     periods = []
     for start, end in matches:
@@ -116,22 +115,18 @@ def parse_time_periods_from_duration(duration_str):
 
 
 def parse_time_periods(time_str):
-    """从时间字符串解析时间段"""
-    periods = []
     if not time_str:
-        return periods
-
-    import re
+        return []
     matches = re.findall(r'(\d{2}:\d{2})-(\d{2}:\d{2})', time_str)
+    periods = []
     for start, end in matches:
         periods.append({"start": start, "end": end})
     return periods
 
 
 def generate_report_content(date_str, lines, time_periods, work_order, today_plans,
-                          actual_scenes, processes, problems, todo_item,
-                          test_results, completions, next_plan_scene, next_plan_processes, coordination):
-    """生成报告内容"""
+                           actual_scenes, processes, problems, todo_item,
+                           test_results, completions, next_plan_scene, next_plan_processes, coordination):
     total_minutes = 0
     time_display_parts = []
     for p in time_periods:
@@ -229,14 +224,6 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
 
 
 def render_report_form(report_data=None, mode="create", original_filename=None):
-    """
-    渲染报告表单
-
-    Args:
-        report_data: 报告数据字典（edit模式时传入）
-        mode: "create" | "edit"
-        original_filename: 原始文件名（edit模式时用于保存）
-    """
     is_edit = mode == "edit"
     title = "✏️ 编辑报告" if is_edit else "📝 新建报告"
 
@@ -282,10 +269,16 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
     st.markdown("##### 测试时间段")
 
-    time_periods = form_data.get("time_periods", [{"start": "09:30", "end": "12:00"}])
-    period_count = len(time_periods)
+    if "time_periods" not in st.session_state:
+        init_periods = form_data.get("time_periods", [{"start": "09:30", "end": "12:00"}])
+        st.session_state.time_periods = init_periods
 
+    if st.button("➕ 添加时间段"):
+        st.session_state.time_periods.append({"start": "14:30", "end": "18:00"})
+
+    time_periods = st.session_state.time_periods
     new_periods = []
+
     cols_header = st.columns([4, 1, 4, 1])
     with cols_header[0]:
         st.markdown("**开始时间**")
@@ -306,18 +299,16 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
         with cols[0]:
             start_time = st.time_input(f"开始{i}", value=start_default, key=f"time_start_{i}")
         with cols[2]:
-            end_time = st.time_input(f"结束{i}", value=end_default, key=f"time_end_{i}")
+            end_time = st.time_input(f"结束{i}", value=end_time, key=f"time_end_{i}")
         with cols[3]:
-            if i > 0 and st.button("❌", key=f"del_time_{i}", help="删除"):
-                pass
-            else:
-                new_periods.append({
-                    "start": start_time.strftime("%H:%M") if hasattr(start_time, 'strftime') else str(start_time)[:5],
-                    "end": end_time.strftime("%H:%M") if hasattr(end_time, 'strftime') else str(end_time)[:5]
-                })
+            if len(time_periods) > 1 and st.button("❌", key=f"del_time_{i}", help="删除"):
+                st.session_state.time_periods.pop(i)
+                st.rerun()
 
-    if st.button("➕ 添加时间段", use_container_width=False):
-        new_periods.append({"start": "14:30", "end": "18:00"})
+        new_periods.append({
+            "start": start_time.strftime("%H:%M") if hasattr(start_time, 'strftime') else str(start_time)[:5],
+            "end": end_time.strftime("%H:%M") if hasattr(end_time, 'strftime') else str(end_time)[:5]
+        })
 
     time_periods = new_periods
 
@@ -469,11 +460,9 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
     with col_back:
         if is_edit:
             if st.button("← 返回报告列表", use_container_width=True):
-                st.info("正在返回报告列表...")
                 return "back"
         else:
             if st.button("← 返回Dashboard", use_container_width=True):
-                st.info("正在返回Dashboard...")
                 return "back"
 
     with col_save:
@@ -502,8 +491,6 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
                 file_path = REPORT_DIR / save_filename
                 try:
-                    import time
-                    time.sleep(0.5)
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(content)
 

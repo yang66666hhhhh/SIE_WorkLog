@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
+import re
 from datetime import datetime
 from utils.config import Config
 
@@ -8,9 +9,6 @@ st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️"
 
 config = Config()
 
-# =====================
-# 初始化消息
-# =====================
 if "config_msg" not in st.session_state:
     st.session_state.config_msg = None
 
@@ -18,9 +16,6 @@ if st.session_state.config_msg:
     st.session_state.config_msg[0](st.session_state.config_msg[1])
     st.session_state.config_msg = None
 
-# =====================
-# 侧边栏
-# =====================
 with st.sidebar:
     st.header("⚙️ 系统")
     st.caption("主题: 右上角 ⋮ 菜单")
@@ -56,6 +51,23 @@ with st.sidebar:
                     st.error("❌ 格式错误")
             except Exception as e:
                 st.error(f"❌ 失败: {e}")
+
+# =====================
+# 项目名称配置
+# =====================
+st.header("📌 项目配置")
+
+project_name = config.load_project_name()
+new_project_name = st.text_input("项目名称", value=project_name, key="project_name_input")
+if st.button("💾 保存项目名称", key="btn_project_save"):
+    if new_project_name.strip():
+        config.save_project_name(new_project_name.strip())
+        st.session_state.config_msg = (st.success, f"✅ 项目名称已更新")
+        st.rerun()
+    else:
+        st.warning("项目名称不能为空")
+
+st.markdown("---")
 
 # =====================
 # AI 配置
@@ -217,10 +229,14 @@ with tab_tr1:
     tr_pattern = st.text_input("匹配规则（正则，用|分隔）", placeholder="例如：部署|上线|发布", label_visibility="collapsed")
     if st.button("✅ 添加", type="primary", use_container_width=True, key="btn_tr_add"):
         if tr_name and tr_pattern:
-            task_rules[tr_name] = tr_pattern
-            config.save_task_rules(task_rules)
-            st.session_state.config_msg = (st.success, f"已添加：{tr_name}")
-            st.rerun()
+            is_valid, err_msg = config.validate_regex(tr_pattern)
+            if not is_valid:
+                st.error(f"❌ 正则表达式无效: {err_msg}")
+            else:
+                task_rules[tr_name] = tr_pattern
+                config.save_task_rules(task_rules)
+                st.session_state.config_msg = (st.success, f"已添加：{tr_name}")
+                st.rerun()
         else:
             st.session_state.config_msg = (st.warning, "请填写完整")
             st.rerun()
@@ -237,11 +253,15 @@ with tab_tr2:
         new_pattern = st.text_input("匹配规则", value=st.session_state.tr_current_pat, key="tr_pattern_edit")
         if st.button("💾 保存", type="primary", use_container_width=True, key="btn_tr_save"):
             if new_pattern.strip():
-                task_rules[tr_edit_name] = new_pattern
-                config.save_task_rules(task_rules)
-                st.session_state.tr_current_pat = new_pattern
-                st.session_state.config_msg = (st.success, f"已更新：{tr_edit_name}")
-                st.rerun()
+                is_valid, err_msg = config.validate_regex(new_pattern)
+                if not is_valid:
+                    st.error(f"❌ 正则表达式无效: {err_msg}")
+                else:
+                    task_rules[tr_edit_name] = new_pattern
+                    config.save_task_rules(task_rules)
+                    st.session_state.tr_current_pat = new_pattern
+                    st.session_state.config_msg = (st.success, f"已更新：{tr_edit_name}")
+                    st.rerun()
             else:
                 st.session_state.config_msg = (st.warning, "规则不能为空")
                 st.rerun()

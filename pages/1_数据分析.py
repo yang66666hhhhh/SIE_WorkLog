@@ -1,11 +1,20 @@
+import re
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 from pathlib import Path
 from io import BytesIO
 from utils.config import Config
 from utils.processor import WorkRecordProcessor
+from utils.charts import (
+    get_chart_config, create_daily_bar_chart, create_task_pie_chart,
+    create_device_bar_chart, create_stack_bar_chart, create_heatmap,
+    COLORS_MAP, TASK_COLORS, CHART_HEIGHT, CHART_MARGIN
+)
+
+MAX_UPLOAD_SIZE_MB = 10
+ALLOWED_EXTENSIONS = {"xlsx"}
+
 
 @st.cache_data(ttl=3600, show_spinner="📊 正在加载数据...")
 def load_data(file_path):
@@ -17,88 +26,52 @@ def load_data(file_path):
         st.error(f"❌ 数据加载失败: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600)
-def load_processed_data(file_path):
-    return load_data(file_path)
 
-def get_chart_config():
-    return {
-        "displayModeBar": False,
-        "toImageButtonOptions": {
-            "format": "png",
-            "filename": "chart",
-            "height": 600,
-            "width": 800,
-            "scale": 2
-        },
-        "modeBarButtonsToRemove": ["select2d", "lasso2d", "autoScale2d", "pan2d", "zoom2d"],
-        "displaylogo": False,
-        "responsive": True
-    }
+@st.cache_resource
+def get_config():
+    return Config()
 
-COLORS_MAP = {"MSAP": "#4C78A8", "HDI二处": "#F58518"}
-TASK_COLORS = {"调试": "#4C78A8", "联调": "#4C78A8", "配置": "#F58518", "学习": "#E45756", "分析": "#72B7B2", "其他": "#54A24B"}
-CHART_HEIGHT = 280
-CHART_MARGIN = dict(t=15, b=20, l=30, r=30)
 
-def create_bar_chart(data, x, y, color_col=None, orientation="v", title=""):
-    fig = go.Figure()
-    colors = COLORS_MAP if color_col == "来源" else TASK_COLORS
-    for name, grp in data.groupby(color_col) if color_col else [(None, data)]:
-        if color_col:
-            grp_data = grp.sort_values(y, ascending=(orientation == "h"))
-            fig.add_bar(
-                x=grp_data[x] if orientation == "v" else grp_data[y],
-                y=grp_data[y] if orientation == "v" else grp_data[x],
-                orientation=orientation,
-                name=name,
-                marker_color=colors.get(name, "#999999"),
-                text=grp_data[y].apply(lambda v: f"{v:.1f}h" if orientation == "v" else f"{v:.1f}h"),
-                textposition="outside",
-                hovertemplate=f"{name if name else title}: %{{text}}<extra></extra>"
-            )
-        else:
-            fig.add_bar(
-                x=data[x] if orientation == "v" else data[y],
-                y=data[y] if orientation == "v" else data[x],
-                orientation=orientation,
-                marker_color=colors.get(name, "#999999") if name else "#4C78A8",
-                hovertemplate=f"{title}: %{{y:.1f}}h<extra></extra>"
-            )
-    return fig
+@st.cache_resource
+def get_processor():
+    return WorkRecordProcessor()
 
-def create_pie_chart(labels, values, title=""):
-    fig = go.Figure(data=[go.Pie(
-        labels=labels,
-        values=values,
-        hole=0.4,
-        marker_colors=["#4C78A8", "#F58518", "#E45756", "#72B7B2", "#54A24B", "#9D7559"],
-        textinfo="percent",
-        hovertemplate="%{label}: %{percent}<extra></extra>"
-    )])
-    return fig
 
 st.set_page_config(page_title="Data Analysis", layout="wide")
 
-config = Config()
-processor = WorkRecordProcessor()
+config = get_config()
+processor = get_processor()
 
 RAW_FILE = Path("工作记录.xlsx")
 OUTPUT_FILE = Path("任务级数据.xlsx")
 
-# =====================
-# 数据处理
-# =====================
+
 def process_file():
     processor.equipment_dict = config.load_equipment()
-    processor.task_rules = {k: __import__("re").compile(v) for k, v in config.load_task_rules().items()}
+    processor.task_rules = {k: re.compile(v) for k, v in config.load_task_rules().items()}
     processor.process(str(RAW_FILE), str(OUTPUT_FILE))
     config.save_config_hash(config.config_hash())
     st.cache_data.clear()
 
+
+def validate_upload(uploaded_file):
+    if uploaded_file is None:
+        return True, ""
+    ext = Path(uploaded_file.name).suffix.lstrip(".")
+    if ext not in ALLOWED_EXTENSIONS:
+        return False, f"不支持的文件格式：.{ext}，仅支持 .xlsx"
+    if len(uploaded_file.getvalue()) > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        return False, f"文件超过 {MAX_UPLOAD_SIZE_MB}MB 限制"
+    return True, ""
+
+
 uploaded = st.file_uploader("上传原始数据（可选，目录下已有工作记录.xlsx）", type=["xlsx"])
 
 if uploaded:
+    is_valid, msg = validate_upload(uploaded)
+    if not is_valid:
+        st.error(f"❌ {msg}")
+        st.stop()
     RAW_FILE.write_bytes(uploaded.getvalue())
     st.success(f"已保存：{uploaded.name}")
 
@@ -106,7 +79,6 @@ if not RAW_FILE.exists():
     st.warning("未找到工作记录.xlsx，请上传数据文件")
     st.stop()
 
-# 配置变更检测
 current_hash = config.config_hash()
 saved_hash = config.load_config_hash()
 
@@ -125,17 +97,8 @@ if need_process:
 with st.spinner("📊 加载数据中..."):
     df = load_data(str(OUTPUT_FILE))
 
-if st.button("🔄 重新处理", type="secondary"):
-        st.cache_data.clear()
-        try:
-            process_file()
-            st.success("重新处理完成")
-            st.rerun()
-        except Exception as e:
-            st.error(f"处理失败: {e}")
-
 # =====================
-# 筛选器（侧边栏 - 可折叠）
+# 筛选器（侧边栏）
 # =====================
 st.sidebar.markdown("""
 <style>
@@ -203,13 +166,31 @@ with st.sidebar:
             key="device_filter"
         )
 
+    with st.expander("📋 任务类型", expanded=True):
+        task_type = st.multiselect(
+            "选择任务类型",
+            df["任务类型"].unique(),
+            default=df["任务类型"].unique(),
+            key="task_type_filter"
+        )
+
     st.divider()
+
+    if st.button("🔄 重新处理数据", type="secondary", use_container_width=True):
+        st.cache_data.clear()
+        try:
+            process_file()
+            st.success("重新处理完成")
+            st.rerun()
+        except Exception as e:
+            st.error(f"处理失败: {e}")
 
 df = df[
     (df["日期"] >= pd.to_datetime(start_date))
     & (df["日期"] <= pd.to_datetime(end_date))
     & (df["来源"].isin(source))
     & (df["线体/设备"].isin(device))
+    & (df["任务类型"].isin(task_type))
 ]
 
 if len(df) == 0:
@@ -260,128 +241,29 @@ col_left, col_right = st.columns(2)
 
 with col_left:
     st.subheader("工时趋势")
-    daily = df.groupby(["日期", "来源"])["工时"].sum().reset_index()
-    fig = go.Figure()
-    for src_name, grp in daily.groupby("来源"):
-        fig.add_bar(
-            x=grp["日期"], y=grp["工时"], name=src_name,
-            marker_color=COLORS_MAP.get(src_name, "#999999"),
-            hovertemplate="<b>%{x|%Y-%m-%d}</b><br>%{y:.1f}h<extra>" + src_name + "</extra>"
-        )
-    fig.update_layout(
-        barmode="group", height=CHART_HEIGHT,
-        margin=CHART_MARGIN,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        yaxis_title="工时 (h)",
-        hovermode="x unified"
-    )
+    fig = create_daily_bar_chart(df)
     st.plotly_chart(fig, use_container_width=True, config=get_chart_config())
 
 with col_right:
     st.subheader("任务类型分布")
-    type_data = df.groupby("任务类型")["工时"].sum().reset_index().sort_values("工时", ascending=False)
-    fig_pie = go.Figure(data=[go.Pie(
-        labels=type_data["任务类型"], values=type_data["工时"], hole=0.4,
-        marker_colors=["#4C78A8", "#F58518", "#E45756", "#72B7B2", "#54A24B", "#9D7559"],
-        textinfo="percent",
-        hovertemplate="%{label}<br>%{percent}<br>%{value:.1f}h<extra></extra>"
-    )])
-    fig_pie.update_layout(
-        height=CHART_HEIGHT, margin=CHART_MARGIN,
-        annotations=[dict(text=f"{type_data['工时'].sum():.0f}h", x=0.5, y=0.5, font_size=16, showarrow=False)]
-    )
+    fig_pie = create_task_pie_chart(df)
     st.plotly_chart(fig_pie, use_container_width=True, config=get_chart_config())
 
 col_mid_left, col_mid_right = st.columns(2)
 
 with col_mid_left:
     st.subheader("设备工时分布")
-    dev_data = df.groupby(["线体/设备", "来源"])["工时"].sum().reset_index().sort_values("工时", ascending=True)
-    fig_dev = go.Figure()
-    for src_name, grp in dev_data.groupby("来源"):
-        fig_dev.add_bar(
-            y=grp["线体/设备"], x=grp["工时"], orientation="h", name=src_name,
-            marker_color=COLORS_MAP.get(src_name, "#999999"),
-            text=grp["工时"].apply(lambda x: f"{x:.1f}h"),
-            textposition="outside",
-            hovertemplate="%{y}<br>%{x:.1f}h<extra>{src_name}</extra>"
-        )
-    fig_dev.update_layout(
-        barmode="group", height=CHART_HEIGHT,
-        margin=dict(t=15, b=20, l=100, r=30), xaxis_title="工时 (h)",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        hovermode="closest"
-    )
+    fig_dev = create_device_bar_chart(df)
     st.plotly_chart(fig_dev, use_container_width=True, config=get_chart_config())
 
 with col_mid_right:
     st.subheader("每日任务分布")
-    stack_data = df.groupby(["日期", "任务类型"])["工时"].sum().reset_index()
-    pivot = stack_data.pivot(index="日期", columns="任务类型", values="工时").fillna(0).reset_index()
-    fig_stack = go.Figure()
-    for col_name in pivot.columns:
-        if col_name != "日期":
-            fig_stack.add_bar(
-                x=pivot["日期"], y=pivot[col_name], name=col_name,
-                marker_color=TASK_COLORS.get(col_name, "#999999"),
-                hovertemplate="%{x|%m-%d}<br>%{y:.1f}h<extra>{col_name}</extra>"
-            )
-    fig_stack.update_layout(
-        barmode="stack", height=CHART_HEIGHT,
-        margin=CHART_MARGIN,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis_title="日期", yaxis_title="工时 (h)",
-        hovermode="x unified"
-    )
+    fig_stack = create_stack_bar_chart(df)
     st.plotly_chart(fig_stack, use_container_width=True, config=get_chart_config())
 
-# ---- 热力图 ----
 st.subheader("📅 周工时热力图")
-df["星期"] = df["日期"].dt.day_name()
-df["周数"] = df["日期"].dt.isocalendar().week.astype(int)
-week_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-week_cn = {"Monday": "周一", "Tuesday": "周二", "Wednesday": "周三", "Thursday": "周四", "Friday": "周五", "Saturday": "周六", "Sunday": "周日"}
-
-heat_data = df.groupby(["周数", "星期"])["工时"].sum().reset_index()
-heat_pivot = heat_data.pivot(index="星期", columns="周数", values="工时").reindex(week_order)
-
-all_weeks = list(heat_pivot.columns)
-all_days = week_order
-
-z_values = []
-text_values = []
-
-for day in all_days:
-    z_row = []
-    text_row = []
-    for week in all_weeks:
-        if day in heat_pivot.index and week in heat_pivot.columns:
-            val = heat_pivot.loc[day, week] if pd.notna(heat_pivot.loc[day, week]) else 0
-        else:
-            val = 0
-        z_row.append(val if val > 0 else -1)
-        text_row.append(f"{val:.1f}h" if val > 0 else "休")
-    z_values.append(z_row)
-    text_values.append(text_row)
-
-fig_heat = go.Figure(data=go.Heatmap(
-    z=z_values,
-    x=[f"W{w}" for w in all_weeks],
-    y=[week_cn.get(d, d) for d in all_days],
-    colorscale=[[0, "#e0e0e0"], [0.01, "#fff7bc"], [0.3, "#fec44f"], [0.6, "#fe9929"], [1, "#d95f0e"]],
-    showscale=True,
-    text=text_values,
-    texttemplate="%{text}",
-    hovertemplate="<b>%{y}</b><br>W %{x}<br>%{text}<extra></extra>"
-))
-fig_heat.update_layout(
-    height=250,
-    margin=CHART_MARGIN,
-    yaxis=dict(autorange="reversed"),
-    coloraxis_colorbar=dict(title="工时", tickformat=".0f")
-)
+fig_heat = create_heatmap(df)
 st.plotly_chart(fig_heat, use_container_width=True, config=get_chart_config())
-
 st.caption("💤 灰=休息日 | 颜色=工时")
 
 # =====================
@@ -402,8 +284,8 @@ with tab2:
     st.dataframe(dev_df.drop(columns=drop_cols), use_container_width=True)
 
 with tab3:
-    task_type = st.selectbox("选择任务类型", df["任务类型"].unique(), key="type_select")
-    type_df = df[df["任务类型"] == task_type]
+    task_type_sel = st.selectbox("选择任务类型", df["任务类型"].unique(), key="type_select")
+    type_df = df[df["任务类型"] == task_type_sel]
     st.metric("类型总工时", f"{type_df['工时'].sum():.1f}h")
     st.dataframe(type_df.drop(columns=drop_cols), use_container_width=True)
 
