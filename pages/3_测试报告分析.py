@@ -349,8 +349,8 @@ def render_analysis_page():
                     line_problems = by_line.get_group(line_name)
                     line_count = len(line_problems)
                     with st.expander(f"🔧 {line_name} · {line_count}条", expanded=False):
-                        for _, prob in line_problems.iterrows():
-                            render_problem_card(prob["线体"], prob["状态"], prob["原始描述"])
+                        for _, prob in line_problems.sort_values("日期", ascending=False).iterrows():
+                            render_problem_card(prob["线体"], prob["状态"], prob["原始描述"], date=prob["日期"])
 
     # =====================
     # 报告详情
