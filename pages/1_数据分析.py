@@ -6,7 +6,9 @@ from html import escape
 from pathlib import Path
 from io import BytesIO
 from utils.config import Config
-from utils.processor import WorkRecordProcessor
+from utils.ai_chat_interface import render_natural_language_query
+from utils.intelligent_cache import IntelligentCache
+from utils.optimized_processor import OptimizedWorkRecordProcessor
 from utils.charts import (
     get_chart_config, create_daily_bar_chart, create_task_pie_chart,
     create_device_bar_chart, create_stack_bar_chart, create_heatmap,
@@ -21,9 +23,14 @@ ALLOWED_EXTENSIONS = {"xlsx"}
 
 
 @st.cache_data(ttl=3600, show_spinner="📊 正在加载数据...")
-def load_data(file_path):
+def load_data(file_path, file_mtime_ns=0, file_size=0):
     try:
-        df = pd.read_excel(file_path)
+        cache = IntelligentCache()
+        cache_key = cache.build_key("load_data", file_path, file_mtime_ns, file_size)
+        df = cache.get(cache_key)
+        if df is None:
+            df = pd.read_excel(file_path)
+            cache.set(cache_key, df)
         df["日期"] = pd.to_datetime(df["日期"])
         return df
     except Exception as e:
@@ -38,7 +45,7 @@ def get_config():
 
 @st.cache_resource
 def get_processor():
-    return WorkRecordProcessor()
+    return OptimizedWorkRecordProcessor()
 
 
 st.set_page_config(page_title="Data Analysis", layout="wide")
@@ -49,6 +56,13 @@ processor = get_processor()
 
 RAW_FILE = Path("工作记录.xlsx")
 OUTPUT_FILE = Path("任务级数据.xlsx")
+
+
+def load_output_data():
+    if not OUTPUT_FILE.exists():
+        return pd.DataFrame()
+    stat = OUTPUT_FILE.stat()
+    return load_data(str(OUTPUT_FILE), stat.st_mtime_ns, stat.st_size)
 
 
 def process_file():
@@ -123,7 +137,7 @@ with st.sidebar:
         st.info("请先上传数据文件")
     else:
         if OUTPUT_FILE.exists():
-            df_preview = load_data(str(OUTPUT_FILE))
+            df_preview = load_output_data()
         else:
             df_preview = pd.DataFrame()
 
@@ -207,7 +221,7 @@ if need_process:
             st.stop()
 
 with st.spinner("📊 加载数据中..."):
-    df = load_data(str(OUTPUT_FILE))
+    df = load_output_data()
 
 if df.empty:
     render_empty_state("📭", "数据为空", "处理后的数据为空，请检查原始数据文件")
@@ -352,6 +366,9 @@ with tab4:
     src_df = df_show[df["来源"] == src]
     st.metric("来源总工时", f"{src_df['工时'].sum():.1f}h")
     st.dataframe(src_df, use_container_width=True, hide_index=True, column_config=col_config)
+
+with st.expander("💬 自然语言查询", expanded=False):
+    render_natural_language_query(df_show, key_prefix="worklog_nlq")
 
 # =====================
 # AI 分析

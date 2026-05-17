@@ -9,6 +9,7 @@ class TestReportProcessor:
     REPORT_DIR = Path("report")
 
     CATEGORIES = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"]
+    KNOWN_LINES = ["VCP1", "VCP2", "PLB"]
 
     def __init__(self, report_dir=None):
         if report_dir:
@@ -17,11 +18,13 @@ class TestReportProcessor:
     def parse_report(self, file_path: Path) -> dict:
         """解析单个测试报告文件"""
         content = file_path.read_text(encoding="utf-8")
+        line_text = self._extract_line_from_filename(file_path.name)
 
         result = {
             "文件名": file_path.name,
-            "日期": self._extract_date(content),
-            "线体": self._extract_line_from_filename(file_path.name),
+            "日期": self._extract_date(content, file_path.name),
+            "线体": line_text,
+            "线体列表": self.split_line_names(line_text),
             "今日计划": self._extract_field(content, "今日计划"),
             "测试总时长": self._extract_field(content, "测试总时长"),
             "实际场景": self._extract_field(content, "实际场景"),
@@ -39,9 +42,12 @@ class TestReportProcessor:
 
         return result
 
-    def _extract_date(self, content: str) -> str:
+    def _extract_date(self, content: str, fallback_filename: str = "") -> str:
         """提取日期"""
         match = re.search(r"【日期】(\d{4}-\d{2}-\d{2})", content)
+        if match:
+            return match.group(1)
+        match = re.search(r"(\d{4}-\d{2}-\d{2})", fallback_filename)
         if match:
             return match.group(1)
         return ""
@@ -50,10 +56,21 @@ class TestReportProcessor:
         """从文件名提取线体"""
         filename_upper = filename.upper()
         lines = []
-        for line in ["VCP1", "VCP2", "PLB"]:
+        for line in self.KNOWN_LINES:
             if line in filename_upper:
                 lines.append(line)
         return ", ".join(lines) if lines else "其他"
+
+    def split_line_names(self, line_text: str) -> list:
+        """拆分逗号分隔的线体文本"""
+        if not line_text:
+            return []
+        parts = [part.strip() for part in str(line_text).split(",") if part.strip()]
+        unique_parts = []
+        for part in parts:
+            if part not in unique_parts:
+                unique_parts.append(part)
+        return unique_parts
 
     def _extract_field(self, content: str, field_name: str) -> str:
         """提取字段内容"""
@@ -66,7 +83,8 @@ class TestReportProcessor:
 
     def _extract_coordination(self, content: str) -> str:
         """提取需要协调事项"""
-        match = re.search(r"需要协调事项：(.+)", content)
+        tomorrow_plan = self._extract_field(content, "明日计划")
+        match = re.search(r"需要协调事项[:：](.+)", tomorrow_plan)
         if match:
             return match.group(1).strip()
         return "无"
@@ -79,7 +97,6 @@ class TestReportProcessor:
             return problems
 
         lines = problem_section.split("\n")
-        i = 0
         current_module = None
         pending_texts = []
 
@@ -97,63 +114,32 @@ class TestReportProcessor:
                 })
             pending_texts = []
 
-        while i < len(lines):
-            line = lines[i]
-            stripped = line.strip()
-
+        for raw_line in lines:
+            stripped = raw_line.strip()
             if not stripped:
-                i += 1
                 continue
 
-            tab_count = line.count('\t')
-
-            if tab_count >= 2:
-                pending_texts.append(stripped)
-            elif tab_count == 1:
-                if "：" in stripped or ":" in stripped:
-                    colon_pos = stripped.find("：")
-                    if colon_pos == -1:
-                        colon_pos = stripped.find(":")
-                    if colon_pos > 0:
-                        module_name = stripped[:colon_pos].strip()
-                        text_after = stripped[colon_pos+1:].strip()
-                        save_problem()
-                        current_module = module_name
-                        if text_after and text_after != "无":
-                            pending_texts = [text_after]
-                        else:
-                            pending_texts = []
-                else:
-                    pending_texts.append(stripped)
-            else:
-                if stripped.startswith(("①", "②", "③", "④", "⑤")):
-                    if current_module and pending_texts:
-                        combined = "\n".join(pending_texts).strip()
-                        if combined and combined != "无":
-                            save_problem()
+            if stripped.startswith(("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩")):
+                if not current_module:
                     current_module = "其他"
-                    pending_texts = [stripped]
-                else:
-                    save_problem()
-                    if "：" in stripped or ":" in stripped:
-                        colon_pos = stripped.find("：")
-                        if colon_pos == -1:
-                            colon_pos = stripped.find(":")
-                        if colon_pos > 0:
-                            module_name = stripped[:colon_pos].strip()
-                            text_after = stripped[colon_pos+1:].strip()
-                            current_module = module_name
-                            if text_after and text_after != "无":
-                                pending_texts = [text_after]
-                            else:
-                                pending_texts = []
-                        else:
-                            current_module = stripped
-                            pending_texts = []
-                    else:
-                        current_module = stripped
-                        pending_texts = []
-            i += 1
+                save_problem()
+                pending_texts = [stripped]
+                continue
+
+            module_match = re.match(r"^(.+?)[：:]\s*(.*)$", stripped)
+            if module_match and module_match.group(1).strip() in self.CATEGORIES:
+                module_name = module_match.group(1).strip()
+                text_after = module_match.group(2).strip()
+                save_problem()
+                current_module = module_name
+                pending_texts = [text_after] if text_after and text_after != "无" else []
+                continue
+
+            if current_module:
+                pending_texts.append(stripped)
+            else:
+                current_module = "其他"
+                pending_texts = [stripped]
 
         save_problem()
         return problems

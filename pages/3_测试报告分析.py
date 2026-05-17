@@ -91,6 +91,95 @@ def has_text(value):
     return bool(str(value).strip())
 
 
+def split_line_names(value):
+    if not has_text(value):
+        return []
+    parts = [part.strip() for part in str(value).split(",") if part.strip()]
+    unique_parts = []
+    for part in parts:
+        if part not in unique_parts:
+            unique_parts.append(part)
+    return unique_parts
+
+
+def collect_line_options(values):
+    options = []
+    for value in values:
+        for line_name in split_line_names(value):
+            if line_name not in options:
+                options.append(line_name)
+    return options
+
+
+def line_intersects(value, selected_lines):
+    if not selected_lines:
+        return False
+    line_names = split_line_names(value)
+    return any(line_name in selected_lines for line_name in line_names)
+
+
+def match_problem_lines(row):
+    line_names = split_line_names(row.get("线体", ""))
+    if not line_names:
+        return [row.get("线体", "")]
+
+    description = str(row.get("原始描述", "")).upper()
+    matched = [line_name for line_name in line_names if line_name.upper() in description]
+    return matched or line_names
+
+
+def explode_problem_lines(problem_df):
+    if problem_df.empty:
+        return pd.DataFrame(columns=list(problem_df.columns) + ["线体组合"])
+
+    rows = []
+    for _, row in problem_df.iterrows():
+        line_combo = row.get("线体", "")
+        for line_name in match_problem_lines(row):
+            new_row = row.to_dict()
+            new_row["线体组合"] = line_combo
+            new_row["线体"] = line_name
+            rows.append(new_row)
+    return pd.DataFrame(rows)
+
+
+def summarize_problem_stats(problem_df):
+    if problem_df.empty:
+        return {"total": 0, "resolved": 0, "pending": 0, "investigating": 0, "by_line": {}}
+
+    expanded = explode_problem_lines(problem_df)
+    by_line = {}
+    if not expanded.empty:
+        for line_name in sorted(expanded["线体"].dropna().unique().tolist()):
+            line_df = expanded[expanded["线体"] == line_name]
+            by_line[line_name] = {
+                "total": len(line_df),
+                "resolved": len(line_df[line_df["状态"] == "已解决"]),
+                "pending": len(line_df[line_df["状态"] == "待处理"]),
+                "investigating": len(line_df[line_df["状态"] == "排查中"]),
+            }
+
+    return {
+        "total": len(problem_df),
+        "resolved": len(problem_df[problem_df["状态"] == "已解决"]),
+        "pending": len(problem_df[problem_df["状态"] == "待处理"]),
+        "investigating": len(problem_df[problem_df["状态"] == "排查中"]),
+        "by_line": by_line,
+    }
+
+
+def build_daily_stats(problem_df):
+    if problem_df.empty:
+        return pd.DataFrame(columns=["日期", "问题数", "已解决数", "待处理数"])
+
+    daily = problem_df.groupby("日期").size().reset_index(name="问题数")
+    daily_r = problem_df[problem_df["状态"] == "已解决"].groupby("日期").size().reset_index(name="已解决数")
+    daily_p = problem_df[problem_df["状态"] == "待处理"].groupby("日期").size().reset_index(name="待处理数")
+    result = daily.merge(daily_r, on="日期", how="left")
+    result = result.merge(daily_p, on="日期", how="left")
+    return result.fillna(0)
+
+
 def detail_block_html(title, value, wide=False):
     items = split_report_items(value)
     block_class = "report-detail-block wide" if wide else "report-detail-block"
@@ -138,6 +227,13 @@ def render_report_problem_summary(summary):
 
 
 def render_report_detail(row):
+    tomorrow_plan = row.get("明日计划")
+    if has_text(tomorrow_plan):
+        tomorrow_plan = "\n".join(
+            line for line in str(tomorrow_plan).splitlines()
+            if not line.strip().startswith("需要协调事项")
+        ).strip()
+
     meta_items = [
         ("⏱️", row.get("测试总时长")),
         ("📦", row.get("工单")),
@@ -162,7 +258,8 @@ def render_report_detail(row):
         detail_block_html("测试结果", row.get("测试结果")),
         detail_block_html("计划完成情况", row.get("计划完成情况")),
         detail_block_html("待办项", row.get("待办项")),
-        detail_block_html("明日计划", row.get("明日计划"), wide=True),
+        detail_block_html("明日计划", tomorrow_plan, wide=True),
+        detail_block_html("需要协调事项", row.get("需要协调事项")),
     ]
     st.markdown(f'<div class="report-detail-grid">{"".join(blocks_html)}</div>', unsafe_allow_html=True)
 
@@ -178,13 +275,6 @@ def render_analysis_page():
         if st.button("➕ 创建报告", type="primary", use_container_width=True):
             st.switch_page("pages/4_新建报告.py")
         st.stop()
-
-    problem_df = processor.get_problem_detail(df)
-    stats = processor.get_problem_stats(df)
-    daily_stats = processor.get_daily_stats(df)
-
-    hours_series = df['测试总时长'].str.extract(r'(\d+\.?\d*)')[0].astype(float) if '测试总时长' in df.columns else pd.Series([0])
-    total_hours = hours_series.sum()
 
     # =====================
     # 顶部操作栏
@@ -207,7 +297,7 @@ def render_analysis_page():
             selected_dates = st.multiselect("日期", all_dates, default=all_dates, key="report_date_filter")
 
         with st.expander("🏢 线体", expanded=False):
-            all_lines = df["线体"].unique().tolist()
+            all_lines = collect_line_options(df["线体"].tolist())
             selected_lines = st.multiselect("线体", all_lines, default=all_lines, key="report_line_filter")
 
         with st.expander("📊 问题状态", expanded=False):
@@ -217,6 +307,25 @@ def render_analysis_page():
         st.divider()
         if st.button("🔄 重置筛选", use_container_width=True):
             st.rerun()
+
+    report_mask = df["日期"].isin(selected_dates) & df["线体"].apply(lambda value: line_intersects(value, selected_lines))
+    filtered_reports = df[report_mask].copy()
+    problem_df = processor.get_problem_detail(filtered_reports)
+    filtered_problem_df = problem_df[problem_df["状态"].isin(selected_status)].copy()
+    problem_df_by_line = explode_problem_lines(filtered_problem_df)
+    stats = summarize_problem_stats(filtered_problem_df)
+    daily_stats = build_daily_stats(filtered_problem_df)
+
+    if filtered_reports.empty:
+        render_empty_state("🔍", "没有匹配的测试报告", "请调整日期或线体筛选条件")
+        return
+
+    hours_series = (
+        filtered_reports["测试总时长"].str.extract(r"(\d+\.?\d*)")[0].astype(float)
+        if "测试总时长" in filtered_reports.columns
+        else pd.Series([0.0])
+    )
+    total_hours = hours_series.sum()
 
     # =====================
     # KPI
@@ -281,13 +390,11 @@ def render_analysis_page():
         if stats.get("by_line"):
             line_names = list(stats["by_line"].keys())
             fig3 = go.Figure()
+            status_keys = {"已解决": "resolved", "待处理": "pending", "排查中": "investigating"}
             for status_name, color in [("已解决", SUCCESS), ("待处理", DANGER), ("排查中", WARNING)]:
                 fig3.add_trace(go.Bar(
                     x=line_names,
-                    y=[stats["by_line"][l].get(status_name if status_name != "排查中" else "investigating",
-                        stats["by_line"][l].get("investigating", 0) if status_name == "排查中" else
-                        stats["by_line"][l].get("resolved", 0) if status_name == "已解决" else
-                        stats["by_line"][l].get("pending", 0)) for l in line_names],
+                    y=[stats["by_line"][line_name].get(status_keys[status_name], 0) for line_name in line_names],
                     name=status_name, marker_color=color
                 ))
             fig3.update_layout(
@@ -304,23 +411,17 @@ def render_analysis_page():
     # =====================
     render_section_title("📝", "问题详情")
 
-    if problem_df.empty:
+    if filtered_problem_df.empty:
         render_empty_state("✅", "暂无问题记录", "所有测试报告均无问题描述")
     else:
-        filtered = problem_df[
-            (problem_df["日期"].isin(selected_dates)) &
-            (problem_df["线体"].isin(selected_lines)) &
-            (problem_df["状态"].isin(selected_status))
-        ]
-
         tab_dept, tab_line = st.tabs(["按部门", "按线体"])
 
         with tab_dept:
-            if filtered.empty:
+            if filtered_problem_df.empty:
                 render_empty_state("🔍", "无匹配问题", "请调整筛选条件")
             else:
-                st.markdown(f"**共 {len(filtered)} 条问题**")
-                by_dept = filtered.groupby("来源")
+                st.markdown(f"**共 {len(filtered_problem_df)} 条问题**")
+                by_dept = filtered_problem_df.groupby("来源")
                 dept_order = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）",
                             "生产/工艺", "生产", "工艺", "维护", "IT", "其他"]
                 for dept in dept_order:
@@ -339,11 +440,11 @@ def render_analysis_page():
                                 render_problem_card(prob["线体"], prob["状态"], prob["原始描述"])
 
         with tab_line:
-            if filtered.empty:
+            if problem_df_by_line.empty:
                 render_empty_state("🔍", "无匹配问题", "请调整筛选条件")
             else:
-                by_line = filtered.groupby("线体")
-                for line_name in sorted(filtered["线体"].unique().tolist()):
+                by_line = problem_df_by_line.groupby("线体")
+                for line_name in sorted(problem_df_by_line["线体"].unique().tolist()):
                     if line_name not in by_line.groups:
                         continue
                     line_problems = by_line.get_group(line_name)
@@ -358,7 +459,7 @@ def render_analysis_page():
     render_section_title("📄", "报告详情")
 
     report_search = st.text_input("🔍 搜索报告", placeholder="按日期、线体搜索...", key="report_search")
-    df_search = df.copy()
+    df_search = filtered_reports.copy()
     if report_search:
         mask = df_search.astype(str).apply(lambda x: x.str.contains(report_search, case=False, na=False)).any(axis=1)
         df_search = df_search[mask]
@@ -371,7 +472,7 @@ def render_analysis_page():
                 render_report_detail(row)
         with c2:
             st.write("")
-            if st.button("✏️ 编辑", key=f"e_{row['日期']}_{row.get('线体','')}", use_container_width=True):
+            if st.button("✏️ 编辑", key=f"e_{row.get('文件名', row['日期'])}", use_container_width=True):
                 st.session_state.edit_mode = True
                 st.session_state.edit_report_data = row.to_dict()
                 st.session_state.edit_original_filename = row.get("文件名", "")

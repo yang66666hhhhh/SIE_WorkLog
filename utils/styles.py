@@ -1,3 +1,5 @@
+from html import escape
+
 import streamlit as st
 
 PRIMARY = "#4C78A8"
@@ -423,17 +425,20 @@ def render_problem_card(line_name, status, description, date=None):
     sc = STATUS_COLORS.get(status, "#888")
     lc = LINE_COLORS.get(line_name, "#888")
     si = STATUS_ICONS.get(status, "📋")
-    safe_desc = str(description).replace(chr(10), " · ").replace("<", "&lt;").replace(">", "&gt;")
+    safe_line = escape(str(line_name))
+    safe_status = escape(str(status))
+    safe_desc = escape(str(description).replace(chr(10), " · "))
     date_html = ""
     if date:
-        date_html = f'<span class="status-badge" style="background:#eef4ff;color:#4C78A8;min-width:78px;text-align:center;">📅 {date}</span>'
-    st.markdown(f"""
-    <div class="problem-card">
-        <div style="display:flex;align-items:center;gap:12px;">
-            {date_html}
-            <span class="status-badge" style="background:{lc}20;color:{lc};min-width:55px;text-align:center;">{line_name}</span>
-            <span class="status-badge" style="background:{sc}18;color:{sc};min-width:55px;text-align:center;">{si} {status}</span>
-            <span style="color:#444;font-size:0.88rem;flex:1;line-height:1.4;">{safe_desc}</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        date_html = f'<span class="status-badge" style="background:#eef4ff;color:#4C78A8;min-width:78px;text-align:center;">📅 {escape(str(date))}</span>'
+    st.markdown(
+        f'<div class="problem-card">'
+        f'<div style="display:flex;align-items:center;gap:12px;">'
+        f'{date_html}'
+        f'<span class="status-badge" style="background:{lc}20;color:{lc};min-width:55px;text-align:center;">{safe_line}</span>'
+        f'<span class="status-badge" style="background:{sc}18;color:{sc};min-width:55px;text-align:center;">{si} {safe_status}</span>'
+        f'<span style="color:#444;font-size:0.88rem;flex:1;line-height:1.4;">{safe_desc}</span>'
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )

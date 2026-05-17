@@ -16,6 +16,7 @@ venv/
 
 # Streamlit
 .streamlit/
+.cache/
 
 # Data Files (本地数据不提交)
 *.xlsx
