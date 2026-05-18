@@ -41,6 +41,8 @@ class Config:
         "ai_config": ("ai_config.json", "DEFAULT_AI_CONFIG"),
     }
 
+    DEFAULT_PROBLEMS = []
+
     _OBFUSCATION_KEY = "SIE_WorkLog_2026"
 
     def __init__(self, config_dir="config"):
@@ -106,6 +108,12 @@ class Config:
 
     def save_task_rules(self, data: dict):
         self._save_config("task_rules.json", data)
+
+    def load_problems(self) -> list:
+        return self._load_config("problems.json", "DEFAULT_PROBLEMS")
+
+    def save_problems(self, data: list):
+        self._save_config("problems.json", data)
 
     def load_ai_config(self) -> dict:
         config = self._cached_load("ai_config.json", "DEFAULT_AI_CONFIG")
