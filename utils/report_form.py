@@ -225,14 +225,13 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
         content = problems.get(cat, "").strip()
         if not content or content == "无":
             content_parts.append(f"\t{cat}：无")
-        elif "\n" in content:
-            content_parts.append(f"\t{cat}：")
-            for line in content.split("\n"):
-                line = line.strip()
-                if line:
-                    content_parts.append(f"\t\t{line}")
         else:
-            content_parts.append(f"\t{cat}：{content}")
+            lines = [line.strip() for line in content.split("\n") if line.strip()]
+            if len(lines) == 1:
+                content_parts.append(f"\t{cat}：{lines[0]}")
+            else:
+                content_parts.append(f"\t{cat}：")
+                content_parts.extend(format_numbered_items(lines))
 
     content_parts.append(f"【待办项】{todo_item if todo_item else '无'}")
 
