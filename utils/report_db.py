@@ -44,6 +44,11 @@ def init_db():
             FOREIGN KEY (report_id) REFERENCES reports(id)
         )
     """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_date ON reports(date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_lines ON reports(lines)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_problems_report_id ON problems(report_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_problems_status ON problems(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_problems_category ON problems(category)")
     conn.commit()
     conn.close()
 

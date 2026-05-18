@@ -56,7 +56,16 @@ with tab_list:
     if not all_probs:
         st.info("暂无问题记录")
 
-    for p in all_probs:
+    PAGE_SIZE = 10
+    total = len(all_probs)
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = st.selectbox(f"共 {total_pages} 页", range(1, total_pages + 1), index=total_pages - 1)
+
+    start = (page - 1) * PAGE_SIZE
+    end = min(start + PAGE_SIZE, total)
+    page_probs = all_probs[start:end]
+
+    for p in page_probs:
         with st.container():
             render_tracker_problem_card(p, show_history=True)
 

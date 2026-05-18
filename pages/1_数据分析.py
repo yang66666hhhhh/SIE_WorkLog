@@ -83,7 +83,7 @@ def validate_upload(uploaded_file):
     ext = Path(uploaded_file.name).suffix.lstrip(".")
     if ext not in ALLOWED_EXTENSIONS:
         return False, f"不支持的文件格式：.{ext}，仅支持 .xlsx"
-    if len(uploaded_file.getvalue()) > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+    if uploaded_file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
         return False, f"文件超过 {MAX_UPLOAD_SIZE_MB}MB 限制"
     return True, ""
 
