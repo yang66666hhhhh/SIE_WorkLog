@@ -30,18 +30,20 @@ class OptimizedWorkRecordProcessor(WorkRecordProcessor):
                 return task_type
         return "其他"
 
-    def process(self, input_file, output_file="任务级数据.xlsx"):
-        if not Path(input_file).exists():
-            raise FileNotFoundError(f"输入文件不存在: {input_file}")
+    def process(self, input_file, output_file="任务级数据.xlsx", progress_callback=None, raw_df=None):
+        if raw_df is None:
+            if not Path(input_file).exists():
+                raise FileNotFoundError(f"输入文件不存在: {input_file}")
+            raw_df = pd.read_excel(input_file, engine="openpyxl", dtype=str)
 
-        df = pd.read_excel(input_file)
-        df = self.normalize_columns(df)
+        df = self.normalize_columns(raw_df)
         df["日期"] = pd.to_datetime(df["日期"], errors="coerce").dt.normalize()
         df = df.dropna(subset=["日期"])
 
+        total_rows = len(df)
         rows = []
         day_hours = 8
-        for _, row in df.iterrows():
+        for idx, (_, row) in enumerate(df.iterrows()):
             date = row["日期"]
             problem_desc_raw = row["问题描述"] if pd.notna(row["问题描述"]) else ""
 
@@ -74,6 +76,9 @@ class OptimizedWorkRecordProcessor(WorkRecordProcessor):
                             "备注": row["备注"],
                         }
                     )
+
+        if progress_callback and idx % max(1, total_rows // 20) == 0:
+            progress_callback(idx, total_rows)
 
         df_task = pd.DataFrame(rows)
         if df_task.empty:

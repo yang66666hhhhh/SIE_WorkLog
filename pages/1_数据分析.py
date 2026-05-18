@@ -7,7 +7,7 @@ from pathlib import Path
 from io import BytesIO
 from utils.config import Config
 from utils.ai_chat_interface import render_natural_language_query
-from utils.intelligent_cache import IntelligentCache
+
 from utils.optimized_processor import OptimizedWorkRecordProcessor
 from utils.charts import (
     get_chart_config, create_daily_bar_chart, create_task_pie_chart,
@@ -22,16 +22,11 @@ MAX_UPLOAD_SIZE_MB = 10
 ALLOWED_EXTENSIONS = {"xlsx"}
 
 
-@st.cache_data(ttl=3600, show_spinner="📊 正在加载数据...")
-def load_data(file_path, file_mtime_ns=0, file_size=0):
+@st.cache_data(ttl=3600)
+def load_data(file_path):
     try:
-        cache = IntelligentCache()
-        cache_key = cache.build_key("load_data", file_path, file_mtime_ns, file_size)
-        df = cache.get(cache_key)
-        if df is None:
-            df = pd.read_excel(file_path)
-            cache.set(cache_key, df)
-        df["日期"] = pd.to_datetime(df["日期"])
+        df = pd.read_excel(file_path, engine="openpyxl")
+        df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
         return df
     except Exception as e:
         st.error(f"❌ 数据加载失败: {e}")
@@ -61,28 +56,23 @@ OUTPUT_FILE = Path("任务级数据.xlsx")
 def load_output_data():
     if not OUTPUT_FILE.exists():
         return pd.DataFrame()
-    stat = OUTPUT_FILE.stat()
-    return load_data(str(OUTPUT_FILE), stat.st_mtime_ns, stat.st_size)
+    return load_data(str(OUTPUT_FILE))
 
 
 def process_file():
     processor.equipment_dict = config.load_equipment()
     processor.task_rules = {k: re.compile(v) for k, v in config.load_task_rules().items()}
 
-    raw_df = pd.read_excel(RAW_FILE)
-    total_rows = len(raw_df)
     progress_bar = st.progress(0, text="正在读取数据...")
-    for i in range(0, total_rows, max(1, total_rows // 20)):
-        progress_bar.progress(min((i + total_rows // 20) / total_rows, 1.0),
-                           text=f"正在处理... {min(i, total_rows)}/{total_rows} 行")
-    
-    result = processor.process(str(RAW_FILE), str(OUTPUT_FILE))
-    
+
+    def progress_callback(current, total):
+        pct = min(current / max(total, 1), 1.0)
+        progress_bar.progress(pct, text=f"正在处理... {current}/{total} 行")
+
+    result = processor.process(str(RAW_FILE), str(OUTPUT_FILE), progress_callback=progress_callback)
+
     progress_bar.progress(1.0, text="✅ 处理完成")
-    import time
-    time.sleep(0.3)
-    progress_bar.empty()
-    
+
     config.save_config_hash(config.config_hash())
     st.cache_data.clear()
 
