@@ -4,7 +4,7 @@
 
 基于 Python 的工作记录数据分析系统，将原始 Excel 日志转化为任务级数据模型，提供交互式 BI 分析与自动洞察能力。
 
-**项目路径**: `D:\03_Projects\Work\SIE_WorkLog`
+**项目路径**: `C:\Users\Yang\Desktop\MyProject\SIE_WorkLog`
 
 ---
 
@@ -15,7 +15,7 @@
 | Python | 3.14 | 主语言 |
 | Pandas | 2.0+ | 数据处理 |
 | NumPy | 1.24+ | 数值计算 |
-| Streamlit | 1.30+ | Web UI 框架 |
+| Streamlit | 1.57+ | Web UI 框架 |
 | Plotly | 5.15+ | 图表可视化 |
 | openpyxl | 3.1+ | Excel 读写 |
 | openai | 1.0+ | AI 分析（可选） |
@@ -105,7 +105,9 @@ SIE_WorkLog/
 | 报告分析 | 问题统计、趋势分析、状态分布 |
 | 多维度筛选 | 日期、线体、状态多条件筛选 |
 | 问题详情 | 按部门、日期分组显示问题 |
-| 报告编辑 | 支持编辑现有报告 |
+| 报告编辑 | 支持编辑现有报告（数据完整带出） |
+| 线体动态加载 | 从系统配置 `equipment.json` 读取线体列表 |
+| 问题汇总序号 | 多行内容自动添加 ①② 等序号 |
 
 ### 5. 首页
 
@@ -127,7 +129,7 @@ pip install -r requirements.txt
 
 ```powershell
 # 进入项目目录
-cd D:\03_Projects\Work\SIE_WorkLog
+cd C:\Users\Yang\Desktop\MyProject\SIE_WorkLog
 
 # 激活虚拟环境（如果使用）
 .\.venv\Scripts\Activate.ps1
@@ -281,12 +283,24 @@ python main.py
 8. **安全存储**: API Key 加密存储
 9. **性能优化**: 缓存机制减少重复计算
 10. **测试报告**: 完整的测试报告管理和分析系统
+11. **动态配置**: 线体等选项从系统配置实时读取
+12. **无导航栏**: 隐藏 Streamlit 默认菜单，提升用户体验
 
 ---
 
 ## 更新日志
 
-### v2.2 (当前版本)
+### v2.3 (当前版本)
+- 修复测试报告编辑时 `end_time` 未定义报错
+- 线体选项从系统配置 `equipment.json` 动态加载
+- 隐藏 Streamlit 自带导航栏（汉堡菜单）
+- 修复 `use_container_width` 已废弃警告，统一使用 `width='stretch'`
+- 修复编辑报告时默认值不在选项中的报错（模糊匹配）
+- 修复报告编辑时 `问题汇总` 数据未带出的问题
+- 问题汇总多行内容自动添加 ①② 序号
+- `生产/工艺` 分类在新建报告时无内容则隐藏
+
+### v2.2
 - 优化测试报告分析界面
 - 添加项目名称配置
 - 任务类型配置正则校验
