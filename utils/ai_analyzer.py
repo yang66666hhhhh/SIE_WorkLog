@@ -26,7 +26,7 @@ class AIAnalyzer:
         self.model = model
         self._client = None
         if api_key:
-            self._client = openai.OpenAI(api_key=api_key, base_url=base_url or None)
+            self._client = openai.OpenAI(api_key=api_key, base_url=base_url if base_url else None)
 
     def generate_summary(self, df: pd.DataFrame) -> str:
         if not self.api_key or not self._client:
@@ -47,14 +47,18 @@ class AIAnalyzer:
             )
             return response.choices[0].message.content
         except Exception as e:
-            return f"AI 分析失败: {str(e)}\n\n{self._rule_based_insights(df)}"
+            return f"⚠️ AI 分析失败: {str(e)}\n\n---\n\n{self._rule_based_insights(df)}"
 
     def _calculate_stats(self, df: pd.DataFrame) -> Dict[str, Any]:
         stats = {}
 
         stats["总工时"] = df["工时"].sum()
         stats["总任务数"] = len(df)
-        stats["日均工时"] = df.groupby("日期")["工时"].sum().mean()
+
+        daily_sum = df.groupby("日期")["工时"].sum()
+        stats["日均工时"] = daily_sum.mean()
+        stats["工作天数"] = len(daily_sum)
+        stats["日工时标准差"] = daily_sum.std() if len(daily_sum) > 1 else 0
 
         if "来源" in df.columns:
             src_stats = df.groupby("来源")["工时"].agg(["sum", "count"]).round(1)
@@ -74,6 +78,11 @@ class AIAnalyzer:
         if "是否周末" in df.columns:
             weekend_hours = df[df["是否周末"] == True]["工时"].sum()
             stats["周末工时"] = weekend_hours
+            stats["周末占比"] = f"{weekend_hours / stats['总工时'] * 100:.0f}%" if stats['总工时'] > 0 else "0%"
+
+        daily_hours = df.groupby("日期")["工时"].sum().sort_index()
+        if len(daily_hours) >= 2:
+            stats["近7天趋势"] = "下降" if daily_hours.tail(3).mean() < daily_hours.head(3).mean() else "上升"
 
         return stats
 
@@ -83,9 +92,11 @@ class AIAnalyzer:
 【总体数据】
 - 总工时: {stats['总工时']:.1f}h
 - 总任务数: {stats['总任务数']}个
+- 工作天数: {stats.get('工作天数', 'N/A')}天
 - 日均工时: {stats['日均工时']:.1f}h
 - 平均任务耗时: {stats['平均任务耗时']}h
 - 最长任务: {stats['最长任务']:.1f}h
+- 日工时波动: {stats.get('日工时标准差', 0):.1f}h
 
 """
         if "来源分布" in stats:
@@ -104,32 +115,16 @@ class AIAnalyzer:
                 prompt += f"- {task_type}: {data:.1f}h\n"
 
         if "周末工时" in stats:
-            prompt += f"\n【周末工作】: {stats['周末工时']:.1f}h\n"
+            prompt += f"\n【周末工作】: {stats['周末工时']:.1f}h ({stats.get('周末占比', 'N/A')})\n"
+
+        if "近7天趋势" in stats:
+            prompt += f"\n【近7天趋势】: {stats['近7天趋势']}\n"
 
         prompt += """
-请提供3-5个最有价值的分析洞察。
+请提供4-6个最有价值的分析洞察，包含数据支撑和改进建议。
 """
         return prompt
 
     def _rule_based_insights(self, df: pd.DataFrame) -> str:
-        insights = []
-        insights.append("**基础统计**")
-        insights.append(f"- 总工时: {df['工时'].sum():.1f}h, 任务数: {len(df)}")
-
-        if "来源" in df.columns and df["来源"].nunique() > 1:
-            src_hours = df.groupby("来源")["工时"].sum().sort_values(ascending=False)
-            dominant = src_hours.index[0]
-            pct = src_hours.iloc[0] / src_hours.sum() * 100
-            insights.append(f"- 主要来源: {dominant} ({pct:.0f}%)")
-
-        if "任务类型" in df.columns:
-            type_hours = df.groupby("任务类型")["工时"].sum().sort_values(ascending=False)
-            top_type = type_hours.index[0]
-            insights.append(f"- 主要任务: {top_type} ({type_hours.iloc[0]:.1f}h)")
-
-        avg = df["工时"].mean()
-        outliers = df[df["工时"] > avg * 2]
-        if len(outliers) > 0:
-            insights.append(f"- 异常耗时任务: {len(outliers)}个 (>{avg*2:.1f}h)")
-
-        return "\n".join(insights)
+        from utils.analyzer import generate_insights
+        return generate_insights(df)

@@ -172,7 +172,9 @@ class TestReportProcessor:
                 parsed = self._parse_content(r.get("content", ""), r.get("filename", ""))
                 parsed["文件名"] = r.get("filename", "")
                 parsed["日期"] = r.get("date", "")
-                parsed["线体"] = r.get("lines", "")
+                lines_field = r.get("lines", "")
+                parsed["线体"] = lines_field
+                parsed["问题列表"] = self._extract_problems_new(r.get("content", ""), lines_field)
                 rows.append(parsed)
             if rows:
                 return pd.DataFrame(rows)

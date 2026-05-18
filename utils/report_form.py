@@ -338,6 +338,7 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
     if st.button("➕ 添加时间段"):
         st.session_state.time_periods.append({"start": "14:30", "end": "18:00"})
+        st.rerun()
 
     time_periods = st.session_state.time_periods
     new_periods = []

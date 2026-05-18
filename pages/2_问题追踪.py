@@ -72,6 +72,7 @@ with tab_list:
                     note = st.text_input("备注", placeholder="状态变更说明...", key=f"note_{p['id']}")
                     if st.button("✅ 确认更新", key=f"up_{p['id']}"):
                         update_problem_status(p["id"], new_status, note)
+                        st.toast(f"✅ 已更新为：{new_status}", icon="✅")
                         st.rerun()
 
             with col_del:
@@ -79,6 +80,7 @@ with tab_list:
                 st.write("")
                 if st.button("🗑️ 删除", key=f"del_{p['id']}"):
                     delete_problem(p["id"])
+                    st.toast("🗑️ 问题已删除", icon="🗑️")
                     st.rerun()
 
         st.divider()

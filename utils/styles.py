@@ -17,14 +17,17 @@ SOURCE_COLORS = {"MSAP": PRIMARY, "HDI二处": WARNING}
 
 
 def inject_global_css():
+    st.html("""
+    <style>
+        [data-testid="stSidebarNav"], [data-testid="stSidebarNavLinks"] {
+            display: none !important;
+        }
+    </style>
+    """)
     st.markdown("""
     <style>
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #f8f9fa 0%, #eaeef3 100%);
-        }
-        /* 只隐藏 Streamlit 内置导航区，保留侧边栏里的自定义按钮和筛选项 */
-        [data-testid="stSidebarNav"] {
-            display: none !important;
         }
         [data-testid="stSidebar"] .sidebar-title {
             font-size: 15px;
@@ -411,6 +414,7 @@ def render_sidebar_nav(current_page="首页"):
     pages = [
         ("🏠 首页", "首页", "dashboard"),
         ("📊 数据分析", "数据分析", "pages/1_数据分析"),
+        ("🔍 问题追踪", "问题追踪", "pages/2_问题追踪"),
         ("📋 测试报告", "测试报告", "pages/3_测试报告分析"),
         ("⚙️ 系统配置", "系统配置", "pages/5_系统配置"),
     ]

@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from html import escape
 from pathlib import Path
+from utils.config import Config  # noqa: F401
 from utils.test_report_processor import TestReportProcessor
 from utils.report_form import render_report_form
 from utils.styles import (

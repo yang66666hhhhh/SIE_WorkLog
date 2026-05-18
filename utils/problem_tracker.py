@@ -1,6 +1,6 @@
 """问题追踪管理模块"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils.config import Config
 
 _config = Config()
@@ -105,7 +105,7 @@ def get_weekly_summary() -> dict:
     week_start = today.isoweekday()
     week_days = []
     for i in range(7):
-        day = today - datetime.timedelta(days=today.isoweekday() - 1 - i)
+        day = today - timedelta(days=today.isoweekday() - 1 - i)
         week_days.append(day.strftime("%Y-%m-%d"))
 
     total = len(problems)

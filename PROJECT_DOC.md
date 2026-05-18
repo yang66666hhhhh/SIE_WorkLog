@@ -44,7 +44,8 @@ SIE_WorkLog/
 │   ├── report_form.py       # 报告表单模块
 │   ├── problem_tracker.py    # 问题追踪模块
 │   ├── report_db.py          # SQLite 数据库模块
-│   └── test_report_processor.py # 测试报告处理器
+│   ├── test_report_processor.py # 测试报告处理器
+│   └── test_report_ai_analyzer.py # 测试报告 AI 分析
 ├── config/
 │   ├── equipment.json       # 设备线体配置
 │   ├── task_rules.json      # 任务类型规则
@@ -111,6 +112,7 @@ SIE_WorkLog/
 | 报告编辑 | 支持编辑现有报告（数据完整带出） |
 | 线体动态加载 | 从系统配置 `equipment.json` 读取线体列表 |
 | 问题汇总序号 | 多行内容自动添加 ①② 等序号 |
+| AI 智能分析 | 规则分析 + LLM 增强，失败自动 fallback |
 | 提交前预览 | 生成前完整预览报告内容 |
 | 表单校验 | 必填项检查、时间段逻辑校验 |
 | 草稿自动保存 | 新建报告内容自动保存，刷新不丢失 |
@@ -306,7 +308,19 @@ python main.py
 
 ## 更新日志
 
-### v2.5 (当前版本)
+### v2.7 (当前版本)
+- 测试报告新增 AI 智能分析（规则分析 + LLM 增强）
+- 测试报告 AI 分析：问题概览、部门/线体分布、高频关键词洞察
+- 增强版数据分析智能分析（7大维度：概览卡片、设备分析、来源分析、问题关键词）
+- AI 分析失败时自动 fallback 到规则分析
+- AI 兼容 DeepSeek 等 OpenAI 兼容模型
+
+### v2.6
+- 增强版数据分析智能分析（7大维度：概览卡片、设备分析、来源分析、问题关键词）
+- 智能分析支持 DeepSeek 等 OpenAI 兼容模型
+- AI 分析失败时自动 fallback 到规则分析
+
+### v2.5
 - SQLite 数据库存储测试报告（`config/reports.db`）
 - 启动时自动从 txt 迁移到数据库
 - 新建/编辑报告时同步写入数据库
@@ -377,6 +391,7 @@ python main.py
 | `utils/charts.py` | 图表模块 |
 | `utils/report_form.py` | 报告表单模块 |
 | `utils/test_report_processor.py` | 测试报告处理器 |
+| `utils/test_report_ai_analyzer.py` | 测试报告 AI 分析模块 |
 | `config/reports.db` | SQLite 测试报告数据库 |
 | `config/equipment.json` | 设备线体配置 |
 | `config/task_rules.json` | 任务类型规则 |
