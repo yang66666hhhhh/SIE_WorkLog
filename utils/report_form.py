@@ -313,7 +313,7 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
         with cols[0]:
             start_time = st.time_input(f"开始{i}", value=start_default, key=f"{form_key}_time_start_{i}")
         with cols[2]:
-            end_time = st.time_input(f"结束{i}", value=end_time, key=f"{form_key}_time_end_{i}")
+            end_time = st.time_input(f"结束{i}", value=end_default, key=f"{form_key}_time_end_{i}")
         with cols[3]:
             if len(time_periods) > 1 and st.button("❌", key=f"del_time_{i}", help="删除"):
                 st.session_state.time_periods.pop(i)
