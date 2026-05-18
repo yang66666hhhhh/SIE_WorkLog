@@ -1,6 +1,7 @@
 import re
 import pandas as pd
 from pathlib import Path
+from utils import report_db
 
 
 class TestReportProcessor:
@@ -159,9 +160,27 @@ class TestReportProcessor:
         return "待处理"
 
     def process_all(self) -> pd.DataFrame:
-        """处理所有报告"""
+        """处理所有报告，优先从数据库读取，fallback 到 txt 文件"""
+        try:
+            db_reports = report_db.get_all_reports()
+        except Exception:
+            db_reports = []
+
+        if db_reports:
+            rows = []
+            for r in db_reports:
+                parsed = self._parse_content(r.get("content", ""), r.get("filename", ""))
+                parsed["文件名"] = r.get("filename", "")
+                parsed["日期"] = r.get("date", "")
+                parsed["线体"] = r.get("lines", "")
+                rows.append(parsed)
+            if rows:
+                return pd.DataFrame(rows)
+
         if not self.REPORT_DIR.exists():
             return pd.DataFrame()
+
+        report_db.migrate_from_txt(self.REPORT_DIR)
 
         reports = []
         for file in self.REPORT_DIR.glob("*.txt"):
@@ -177,6 +196,34 @@ class TestReportProcessor:
             return pd.DataFrame()
 
         return pd.DataFrame(reports)
+
+    def _parse_content(self, content: str, filename: str) -> dict:
+        """从数据库内容解析报告字段"""
+        result = {
+            "文件名": filename,
+            "日期": "",
+            "线体": "",
+            "今日计划": self._extract_field(content, "今日计划"),
+            "测试总时长": self._extract_field(content, "测试总时长"),
+            "实际场景": self._extract_field(content, "实际场景"),
+            "工单": self._extract_field(content, "工单"),
+            "流程": self._extract_field(content, "流程"),
+            "问题汇总": self._extract_field(content, "问题汇总"),
+            "待办项": self._extract_field(content, "待办项"),
+            "测试结果": self._extract_field(content, "测试结果"),
+            "计划完成情况": self._extract_field(content, "今日计划实际是否完成"),
+            "明日计划": self._extract_field(content, "明日计划"),
+            "需要协调事项": self._extract_coordination(content),
+        }
+
+        result["线体列表"] = self.split_line_names(result.get("线体", ""))
+        result["问题列表"] = self._extract_problems_new(content, result.get("线体", ""))
+
+        date_match = re.search(r"【日期】(\d{4}-\d{2}-\d{2})", content)
+        if date_match:
+            result["日期"] = date_match.group(1)
+
+        return result
 
     def get_problem_detail(self, df: pd.DataFrame) -> pd.DataFrame:
         """获取所有问题的扁平列表"""

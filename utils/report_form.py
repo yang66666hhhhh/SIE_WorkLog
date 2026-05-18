@@ -7,6 +7,7 @@ from pathlib import Path
 
 CATEGORIES = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"]
 from utils.config import Config
+from utils import report_db
 _config = Config()
 LINE_OPTIONS = list(_config.load_equipment().keys())
 REPORT_DIR = Path("report")
@@ -587,6 +588,9 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
                     REPORT_DIR.mkdir(exist_ok=True)
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(content)
+
+                    lines_str = ", ".join(selected_lines)
+                    report_db.report_to_db(save_filename, date_str, lines_str, content)
 
                     if draft_key in st.session_state:
                         del st.session_state[draft_key]

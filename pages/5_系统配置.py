@@ -5,6 +5,7 @@ import re
 from html import escape
 from datetime import datetime
 from utils.config import Config
+from utils import report_db
 from utils.styles import inject_global_css, render_section_title, render_sidebar_nav
 
 st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️", menu_items=None)
@@ -105,7 +106,7 @@ ai_config = config.load_ai_config()
 
 render_config_overview(project_name, equipment, task_rules, ai_config)
 
-tab_proj, tab_ai, tab_eq, tab_tr = st.tabs(["📌 项目", "🤖 AI 配置", "🏢 设备线体", "📋 任务类型"])
+tab_proj, tab_ai, tab_eq, tab_tr, tab_data = st.tabs(["📌 项目", "🤖 AI 配置", "🏢 设备线体", "📋 任务类型", "💾 数据管理"])
 
 # =====================
 # 项目配置
@@ -327,3 +328,73 @@ with tab_tr:
                 config.save_task_rules(task_rules)
                 st.toast(f"✅ 已删除：{tr_del_name}", icon="✅")
                 st.rerun()
+
+# =====================
+# 数据管理
+# =====================
+with tab_data:
+    render_section_title("💾", "数据管理")
+
+    col_stat1, col_stat2 = st.columns(2)
+    try:
+        db_reports = report_db.get_all_reports()
+        db_count = len(db_reports)
+    except Exception:
+        db_count = 0
+    col_stat1.metric("数据库报告数", db_count)
+    col_stat2.metric("数据库文件", "reports.db")
+
+    st.markdown("---")
+    st.markdown("**🔄 迁移 txt 到数据库**")
+    st.caption("将 report/ 目录下的 txt 报告文件迁移到 SQLite 数据库")
+    if st.button("🚀 执行迁移", width='stretch'):
+        result = report_db.migrate_from_txt()
+        if result["errors"]:
+            for err in result["errors"]:
+                st.error(f"❌ {err}")
+        st.success(f"✅ 成功迁移 {result['migrated']} 份报告")
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("**📤 导出数据**")
+    col_exp1, col_exp2 = st.columns(2)
+    with col_exp1:
+        if st.button("📋 导出 JSON", width='stretch'):
+            export_path = report_db.export_db_json()
+            st.success(f"✅ 已导出：{export_path.name}")
+            with open(export_path, "rb") as f:
+                st.download_button(
+                    "📥 下载 JSON 文件", f,
+                    file_name=export_path.name,
+                    mime="application/json",
+                    width='stretch'
+                )
+    with col_exp2:
+        if st.button("💾 备份数据库", width='stretch'):
+            backup_path = report_db.backup_db()
+            if backup_path:
+                st.success(f"✅ 备份已保存")
+                with open(backup_path, "rb") as f:
+                    st.download_button(
+                        "📥 下载备份文件", f,
+                        file_name=backup_path.name,
+                        mime="application/octet-stream",
+                        width='stretch'
+                    )
+            else:
+                st.warning("数据库文件不存在")
+
+    st.markdown("---")
+    st.markdown("**📥 导入数据**")
+    uploaded = st.file_uploader("选择 JSON 备份文件", type=["json"], key="import_json")
+    if uploaded:
+        import json as json_lib
+        try:
+            data = json_lib.load(uploaded)
+            st.success(f"检测到 {len(data.get('reports', []))} 份报告，{len(data.get('problems', []))} 条问题")
+            if st.button("✅ 确认导入", width='stretch'):
+                result = report_db.import_db_json(uploaded)
+                st.success(f"✅ 导入完成：{result['reports']} 份报告，{result['problems']} 条问题")
+                st.rerun()
+        except Exception as e:
+            st.error(f"❌ 文件格式错误：{e}")

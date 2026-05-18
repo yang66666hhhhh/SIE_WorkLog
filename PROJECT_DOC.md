@@ -43,6 +43,7 @@ SIE_WorkLog/
 │   ├── charts.py            # 图表模块
 │   ├── report_form.py       # 报告表单模块
 │   ├── problem_tracker.py    # 问题追踪模块
+│   ├── report_db.py          # SQLite 数据库模块
 │   └── test_report_processor.py # 测试报告处理器
 ├── config/
 │   ├── equipment.json       # 设备线体配置
@@ -305,7 +306,15 @@ python main.py
 
 ## 更新日志
 
-### v2.4 (当前版本)
+### v2.5 (当前版本)
+- SQLite 数据库存储测试报告（`config/reports.db`）
+- 启动时自动从 txt 迁移到数据库
+- 新建/编辑报告时同步写入数据库
+- 系统配置新增"数据管理"标签页
+- 支持数据库备份、JSON 导出/导入
+- 问题追踪系统
+
+### v2.4
 - 新增问题追踪系统（独立页面）
 - 问题状态独立管理，支持变更历史
 - 问题库支持搜索、筛选
@@ -368,9 +377,11 @@ python main.py
 | `utils/charts.py` | 图表模块 |
 | `utils/report_form.py` | 报告表单模块 |
 | `utils/test_report_processor.py` | 测试报告处理器 |
+| `config/reports.db` | SQLite 测试报告数据库 |
 | `config/equipment.json` | 设备线体配置 |
 | `config/task_rules.json` | 任务类型规则 |
 | `config/ai_config.json` | AI 配置 |
 | `config/project.json` | 项目配置 |
 | `PROJECT_DOC.md` | 项目文档 |
+| `config/reports.db` | SQLite 测试报告数据库 |
 | `requirements.txt` | 依赖管理 |
