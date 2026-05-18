@@ -268,26 +268,36 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
     title = "✏️ 编辑报告" if is_edit else "📝 新建报告"
     form_key = f"{mode}:{original_filename or 'new'}"
 
+    draft_key = f"draft_{form_key}"
+
     if is_edit and report_data:
         form_data = parse_report_to_form(report_data)
         filename = original_filename or report_data.get("文件名", "")
+        if draft_key in st.session_state:
+            saved = st.session_state[draft_key]
+            if isinstance(saved, dict):
+                form_data = saved
     else:
-        form_data = {
-            "report_date": datetime.now().date(),
-            "selected_lines": LINE_OPTIONS[:1] if LINE_OPTIONS else [],
-            "time_detail": "",
-            "work_order": "",
-            "today_plans": [],
-            "actual_scenes": [],
-            "processes": [],
-            "problems": {cat: "" for cat in CATEGORIES},
-            "todo_item": "",
-            "test_results": [],
-            "completions": [],
-            "next_plan_scene": "",
-            "next_plan_processes": [],
-            "coordination": ""
-        }
+        if draft_key in st.session_state and isinstance(st.session_state[draft_key], dict):
+            form_data = st.session_state[draft_key]
+            form_data["report_date"] = datetime.now().date()
+        else:
+            form_data = {
+                "report_date": datetime.now().date(),
+                "selected_lines": LINE_OPTIONS[:1] if LINE_OPTIONS else [],
+                "time_detail": "",
+                "work_order": "",
+                "today_plans": [],
+                "actual_scenes": [],
+                "processes": [],
+                "problems": {cat: "" for cat in CATEGORIES},
+                "todo_item": "",
+                "test_results": [],
+                "completions": [],
+                "next_plan_scene": "",
+                "next_plan_processes": [],
+                "coordination": ""
+            }
         filename = ""
 
     st.subheader(title)
@@ -500,6 +510,15 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
     st.markdown("---")
 
+    with st.expander("👁️ 预览报告内容", expanded=False):
+        preview_date = report_date.strftime("%Y-%m-%d")
+        preview_content = generate_report_content(
+            preview_date, selected_lines, time_periods, work_order,
+            today_plans, actual_scenes, processes, problems, todo_item,
+            test_results, completions, next_plan_scene, next_plan_processes, coordination
+        )
+        st.text_area("报告预览", value=preview_content, height=400, label_visibility="collapsed", disabled=True)
+
     col_back, col_save = st.columns(2)
 
     with col_back:
@@ -515,8 +534,37 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
         submitted = st.button(submit_text, width='stretch', type="primary")
 
         if submitted:
+            errors = []
+            warnings = []
+
             if not selected_lines:
-                st.error("⚠️ 请至少选择一个线体")
+                errors.append("请至少选择一个线体")
+            if total_hours <= 0:
+                errors.append("测试总时长必须大于 0")
+            for i, p in enumerate(time_periods):
+                try:
+                    sh, sm = [int(x) for x in p["start"].split(":")]
+                    eh, em = [int(x) for x in p["end"].split(":")]
+                    if eh * 60 + em <= sh * 60 + sm:
+                        errors.append(f"时间段 {i+1}：结束时间必须晚于开始时间")
+                except (ValueError, KeyError):
+                    errors.append(f"时间段 {i+1}：时间格式无效")
+            if not today_plans:
+                warnings.append("今日计划未填写")
+            if not actual_scenes:
+                warnings.append("实际场景未填写")
+            if not problems or all(not v for v in problems.values()):
+                warnings.append("问题汇总未填写")
+            if not test_results:
+                warnings.append("测试结果未填写")
+
+            if warnings and not errors:
+                for w in warnings:
+                    st.warning(f"⚠️ {w}")
+
+            if errors:
+                for e in errors:
+                    st.error(f"❌ {e}")
                 return None
 
             with st.spinner("正在保存报告..."):
@@ -540,11 +588,32 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(content)
 
+                    if draft_key in st.session_state:
+                        del st.session_state[draft_key]
+
                     st.success(f"✅ {'报告已保存' if is_edit else '报告已生成'}：{save_filename}")
                     st.balloons()
                     return save_filename
                 except Exception as e:
                     st.error(f"❌ 保存失败：{e}")
-                    return None
+    if not is_edit:
+        st.session_state[draft_key] = {
+            "report_date": report_date,
+            "selected_lines": selected_lines,
+            "time_periods": time_periods,
+            "work_order": work_order,
+            "today_plans": today_plans,
+            "actual_scenes": actual_scenes,
+            "processes": processes,
+            "problems": problems,
+            "todo_item": todo_item,
+            "test_results": test_results,
+            "completions": completions,
+            "next_plan_scene": next_plan_scene,
+            "next_plan_processes": next_plan_processes,
+            "coordination": coordination,
+        }
+
+    return None
 
     return None
