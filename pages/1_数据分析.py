@@ -48,7 +48,7 @@ def get_processor():
     return OptimizedWorkRecordProcessor()
 
 
-st.set_page_config(page_title="Data Analysis", layout="wide")
+st.set_page_config(page_title="Data Analysis", layout="wide", menu_items=None)
 inject_global_css()
 
 config = get_config()

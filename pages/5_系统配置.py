@@ -7,7 +7,7 @@ from datetime import datetime
 from utils.config import Config
 from utils.styles import inject_global_css, render_section_title, render_sidebar_nav
 
-st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️")
+st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️", menu_items=None)
 inject_global_css()
 
 config = Config()

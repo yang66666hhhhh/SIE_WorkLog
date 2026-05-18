@@ -6,7 +6,9 @@ from datetime import datetime
 from pathlib import Path
 
 CATEGORIES = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"]
-LINE_OPTIONS = ["VCP1", "VCP2", "PLB"]
+from utils.config import Config
+_config = Config()
+LINE_OPTIONS = list(_config.load_equipment().keys())
 REPORT_DIR = Path("report")
 
 
@@ -279,7 +281,14 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
         report_date = st.date_input("日期", value=default_date, format="YYYY-MM-DD")
 
     with col_lines:
-        selected_lines = st.multiselect("线体", options=LINE_OPTIONS, default=form_data.get("selected_lines", []))
+        raw_defaults = form_data.get("selected_lines", [])
+        valid_defaults = [x for x in raw_defaults if x in LINE_OPTIONS]
+        if not valid_defaults and raw_defaults:
+            for d in raw_defaults:
+                matches = [opt for opt in LINE_OPTIONS if d in opt or opt in d]
+                valid_defaults.extend(matches)
+        valid_defaults = list(dict.fromkeys(valid_defaults))
+        selected_lines = st.multiselect("线体", options=LINE_OPTIONS, default=valid_defaults)
 
     st.markdown("##### 测试时间段")
 

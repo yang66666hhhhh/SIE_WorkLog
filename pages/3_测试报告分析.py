@@ -12,7 +12,7 @@ from utils.styles import (
     STATUS_COLORS, STATUS_ICONS, LINE_COLORS,
 )
 
-st.set_page_config(page_title="测试报告分析", layout="wide", page_icon="📋")
+st.set_page_config(page_title="测试报告分析", layout="wide", page_icon="📋", menu_items=None)
 inject_global_css()
 
 

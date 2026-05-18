@@ -6,7 +6,7 @@ from utils.styles import (
     PRIMARY, SUCCESS, WARNING, INFO,
 )
 
-st.set_page_config(page_title="Work Analytics", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Work Analytics", layout="wide", page_icon="📊", menu_items=None)
 inject_global_css()
 
 with st.sidebar:

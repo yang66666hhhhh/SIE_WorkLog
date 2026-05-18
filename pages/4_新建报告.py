@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.report_form import render_report_form
 from utils.styles import inject_global_css, render_sidebar_nav
 
-st.set_page_config(page_title="新建测试报告", layout="wide", page_icon="📝")
+st.set_page_config(page_title="新建测试报告", layout="wide", page_icon="📝", menu_items=None)
 inject_global_css()
 
 with st.sidebar:
