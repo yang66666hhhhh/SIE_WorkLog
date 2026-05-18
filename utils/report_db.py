@@ -11,6 +11,7 @@ BACKUP_DIR = Path("config/backups")
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -128,11 +129,16 @@ def search_reports(keyword: str = "", date_from: str = "", date_to: str = "", li
 
 def delete_report(filename: str) -> bool:
     conn = get_conn()
+    report = conn.execute("SELECT id FROM reports WHERE filename = ?", (filename,)).fetchone()
+    if not report:
+        conn.close()
+        return False
+    report_id = report["id"]
+    conn.execute("DELETE FROM problems WHERE report_id = ?", (report_id,))
     conn.execute("DELETE FROM reports WHERE filename = ?", (filename,))
     conn.commit()
-    affected = conn.total_changes > 0
     conn.close()
-    return affected
+    return True
 
 
 def get_problems_by_report(report_id: int) -> list:

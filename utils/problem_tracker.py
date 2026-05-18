@@ -94,7 +94,17 @@ def search_problems(keyword: str = "", status: str = "", category: str = "", lin
 def get_pending_problems(days: int = 7) -> list:
     """获取近 N 天未解决的问题"""
     problems = load_problems()
-    pending = [p for p in problems if p.get("status") != "已解决"]
+    cutoff = datetime.now() - timedelta(days=days)
+    pending = []
+    for p in problems:
+        if p.get("status") == "已解决":
+            continue
+        try:
+            p_date = datetime.strptime(p.get("date", ""), "%Y-%m-%d")
+            if p_date >= cutoff:
+                pending.append(p)
+        except (ValueError, TypeError):
+            pending.append(p)
     return pending
 
 

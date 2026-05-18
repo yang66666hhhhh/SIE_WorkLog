@@ -17,7 +17,7 @@ with st.sidebar:
     render_sidebar_nav("问题追踪")
 
 
-def render_problem_card(p: dict, show_history: bool = False):
+def render_tracker_problem_card(p: dict, show_history: bool = False):
     status = p.get("status", "待处理")
     status_color = {"待处理": "🔴", "排查中": "🟡", "已解决": "🟢"}.get(status, "⚪")
     st.markdown(f"**{status_color} {status}** · {p.get('category', '')} · {p.get('line', '')}")
@@ -58,7 +58,7 @@ with tab_list:
 
     for p in all_probs:
         with st.container():
-            render_problem_card(p, show_history=True)
+            render_tracker_problem_card(p, show_history=True)
 
             col_up, col_del = st.columns([1, 1])
             with col_up:
@@ -149,7 +149,7 @@ with tab_summary:
     if pending:
         for p in pending:
             with st.container():
-                render_problem_card(p)
+                render_tracker_problem_card(p)
                 st.divider()
     else:
         st.success("🎉 所有问题已解决！")

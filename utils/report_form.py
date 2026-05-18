@@ -620,5 +620,3 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
         }
 
     return None
-
-    return None
