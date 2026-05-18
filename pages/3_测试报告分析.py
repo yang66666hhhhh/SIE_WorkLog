@@ -272,7 +272,7 @@ def render_analysis_page():
 
     if df.empty:
         render_empty_state("📭", "暂无测试报告", "点击下方按钮创建第一份报告")
-        if st.button("➕ 创建报告", type="primary", use_container_width=True):
+        if st.button("➕ 创建报告", type="primary", width='stretch'):
             st.switch_page("pages/4_新建报告.py")
         st.stop()
 
@@ -281,7 +281,7 @@ def render_analysis_page():
     # =====================
     c_top1, c_top2 = st.columns([4, 1])
     with c_top2:
-        if st.button("➕ 新建报告", type="primary", use_container_width=True):
+        if st.button("➕ 新建报告", type="primary", width='stretch'):
             st.switch_page("pages/4_新建报告.py")
 
     # =====================
@@ -305,7 +305,7 @@ def render_analysis_page():
             selected_status = st.multiselect("状态", all_status, default=all_status, key="report_status_filter")
 
         st.divider()
-        if st.button("🔄 重置筛选", use_container_width=True):
+        if st.button("🔄 重置筛选", width='stretch'):
             st.rerun()
 
     report_mask = df["日期"].isin(selected_dates) & df["线体"].apply(lambda value: line_intersects(value, selected_lines))
@@ -369,7 +369,7 @@ def render_analysis_page():
                 yaxis2=dict(title="解决率 (%)", overlaying="y", side="right", range=[0, 120], showgrid=False),
                 hovermode="x unified"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
     with tab_chart2:
         if stats.get("total", 0) > 0:
@@ -384,7 +384,7 @@ def render_analysis_page():
                 height=320, margin=dict(t=20, b=20, l=20, r=20),
                 annotations=[dict(text=f"{stats['total']}<br>问题", x=0.5, y=0.5, font_size=16, showarrow=False)]
             )
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width='stretch')
 
     with tab_chart3:
         if stats.get("by_line"):
@@ -404,7 +404,7 @@ def render_analysis_page():
                 xaxis_title="线体", yaxis_title="问题数量",
                 hovermode="x unified"
             )
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, width='stretch')
 
     # =====================
     # 问题详情
@@ -472,7 +472,7 @@ def render_analysis_page():
                 render_report_detail(row)
         with c2:
             st.write("")
-            if st.button("✏️ 编辑", key=f"e_{row.get('文件名', row['日期'])}", use_container_width=True):
+            if st.button("✏️ 编辑", key=f"e_{row.get('文件名', row['日期'])}", width='stretch'):
                 st.session_state.edit_mode = True
                 st.session_state.edit_report_data = row.to_dict()
                 st.session_state.edit_original_filename = row.get("文件名", "")

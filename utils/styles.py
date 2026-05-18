@@ -417,7 +417,7 @@ def render_sidebar_nav(current_page="首页"):
     for label, name, page in pages:
         is_active = name == current_page
         btn_type = "primary" if is_active else "secondary"
-        if st.button(label, type=btn_type, use_container_width=True, key=f"nav_{page}"):
+        if st.button(label, type=btn_type, width='stretch', key=f"nav_{page}"):
             st.switch_page(f"{page}.py")
 
 

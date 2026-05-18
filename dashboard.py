@@ -68,7 +68,7 @@ with c1:
         <div class="card-tags">筛选 · 图表 · 导出 · AI分析</div>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("进入数据分析 →", key="goto_data", use_container_width=True, type="primary"):
+    if st.button("进入数据分析 →", key="goto_data", width='stretch', type="primary"):
         st.switch_page("pages/1_数据分析.py")
 
 with c2:
@@ -80,7 +80,7 @@ with c2:
         <div class="card-tags">创建 · 编辑 · 筛选 · 统计</div>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("进入测试报告 →", key="goto_report", use_container_width=True, type="primary"):
+    if st.button("进入测试报告 →", key="goto_report", width='stretch', type="primary"):
         st.switch_page("pages/3_测试报告分析.py")
 
 with c3:
@@ -92,7 +92,7 @@ with c3:
         <div class="card-tags">增删改查 · 正则校验 · 备份</div>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("进入系统配置 →", key="goto_config", use_container_width=True, type="primary"):
+    if st.button("进入系统配置 →", key="goto_config", width='stretch', type="primary"):
         st.switch_page("pages/5_系统配置.py")
 
 st.markdown("---")

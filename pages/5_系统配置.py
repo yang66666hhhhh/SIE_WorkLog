@@ -76,7 +76,7 @@ with st.sidebar:
             backup_json,
             f"config_{datetime.now().strftime('%Y%m%d')}.json",
             mime="application/json",
-            use_container_width=True
+            width='stretch'
         )
 
         uploaded = st.file_uploader("📤 导入配置", type=["json"], key="restore_config")
@@ -187,7 +187,7 @@ with tab_eq:
 
     st.dataframe(
         equipment_df,
-        use_container_width=True, hide_index=True,
+        width='stretch', hide_index=True,
     )
 
     eq_tab1, eq_tab2, eq_tab3 = st.tabs(["➕ 新增", "✏️ 编辑", "🗑️ 删除"])
@@ -197,7 +197,7 @@ with tab_eq:
         eq_name = st.text_input("线体名称", placeholder="例如：LDD棕化线（HDI）", key="eq_add_name")
         eq_kw = st.text_input("关键词（逗号分隔）", placeholder="例如：ldd棕化线（hdi）, hdi", key="eq_add_kw")
         render_keyword_tags(split_keywords(eq_kw))
-        if st.button("✅ 添加", type="primary", use_container_width=True, key="btn_eq_add"):
+        if st.button("✅ 添加", type="primary", width='stretch', key="btn_eq_add"):
             keywords = split_keywords(eq_kw)
             if eq_name.strip() and keywords:
                 if eq_name.strip() in equipment:
@@ -218,7 +218,7 @@ with tab_eq:
             default_kw = ", ".join(equipment.get(edit_name, []))
             new_kw = st.text_input("关键词", value=default_kw, key="eq_kw_edit")
             render_keyword_tags(split_keywords(new_kw))
-            if st.button("💾 保存", type="primary", use_container_width=True, key="btn_eq_save"):
+            if st.button("💾 保存", type="primary", width='stretch', key="btn_eq_save"):
                 keywords = split_keywords(new_kw)
                 if keywords:
                     equipment[edit_name] = keywords
@@ -234,7 +234,7 @@ with tab_eq:
         if del_name:
             st.warning(f"将删除：**{del_name}**")
             confirm_del = st.checkbox("我确认要删除", key="eq_del_confirm")
-            if confirm_del and st.button("🗑️ 确认删除", type="primary", use_container_width=True, key="btn_eq_del"):
+            if confirm_del and st.button("🗑️ 确认删除", type="primary", width='stretch', key="btn_eq_del"):
                 equipment.pop(del_name, None)
                 config.save_equipment(equipment)
                 st.toast(f"✅ 已删除：{del_name}", icon="✅")
@@ -259,7 +259,7 @@ with tab_tr:
 
     st.dataframe(
         task_rule_df,
-        use_container_width=True, hide_index=True,
+        width='stretch', hide_index=True,
     )
 
     tr_tab1, tr_tab2, tr_tab3 = st.tabs(["➕ 新增", "✏️ 编辑", "🗑️ 删除"])
@@ -274,7 +274,7 @@ with tab_tr:
                 st.error(f"❌ 正则表达式无效: {err_msg}")
             else:
                 st.success("✅ 正则表达式有效")
-        if st.button("✅ 添加", type="primary", use_container_width=True, key="btn_tr_add"):
+        if st.button("✅ 添加", type="primary", width='stretch', key="btn_tr_add"):
             if tr_name.strip() and tr_pattern.strip():
                 if tr_name.strip() in task_rules:
                     st.error("任务类型已存在，请使用编辑功能更新规则")
@@ -303,7 +303,7 @@ with tab_tr:
                     st.error(f"❌ 正则表达式无效: {err_msg}")
                 else:
                     st.success("✅ 正则表达式有效")
-            if st.button("💾 保存", type="primary", use_container_width=True, key="btn_tr_save"):
+            if st.button("💾 保存", type="primary", width='stretch', key="btn_tr_save"):
                 if new_pattern.strip():
                     is_valid, err_msg = config.validate_regex(new_pattern)
                     if not is_valid:
@@ -322,7 +322,7 @@ with tab_tr:
         if tr_del_name:
             st.warning(f"将删除：**{tr_del_name}**")
             confirm_del_tr = st.checkbox("我确认要删除", key="tr_del_confirm")
-            if confirm_del_tr and st.button("🗑️ 确认删除", type="primary", use_container_width=True, key="btn_tr_del"):
+            if confirm_del_tr and st.button("🗑️ 确认删除", type="primary", width='stretch', key="btn_tr_del"):
                 task_rules.pop(tr_del_name, None)
                 config.save_task_rules(task_rules)
                 st.toast(f"✅ 已删除：{tr_del_name}", icon="✅")

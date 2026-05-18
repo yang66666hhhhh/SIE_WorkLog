@@ -103,6 +103,36 @@ def parse_report_to_form(report_data):
     if todo_item:
         form_data["todo_item"] = todo_item
 
+    problem_summary = report_data.get("问题汇总", "")
+    if problem_summary:
+        lines = problem_summary.split("\n")
+        current_cat = None
+        pending_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            cat_match = re.match(r"^([^：：]+)[：:]\s*(.*)$", stripped)
+            if cat_match:
+                cat_name = cat_match.group(1).strip()
+                text = cat_match.group(2).strip()
+                if cat_name in CATEGORIES:
+                    if current_cat and pending_lines and form_data["problems"].get(current_cat, "") == "":
+                        combined = "\n".join(pending_lines).strip()
+                        if combined and combined != "无":
+                            form_data["problems"][current_cat] = combined
+                    current_cat = cat_name
+                    pending_lines = [text] if text and text != "无" else []
+                    continue
+            if current_cat and stripped not in ("无", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"):
+                if stripped.startswith(("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩")):
+                    stripped = stripped[2:].strip()
+                pending_lines.append(stripped)
+        if current_cat and pending_lines and form_data["problems"].get(current_cat, "") == "":
+            combined = "\n".join(pending_lines).strip()
+            if combined and combined != "无":
+                form_data["problems"][current_cat] = combined
+
     return form_data
 
 
@@ -396,8 +426,11 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
     st.markdown("---")
     st.subheader("⚠️ 问题汇总")
     problems = {}
+    optional_cat = "生产/工艺"
     for cat in CATEGORIES:
         val = form_data["problems"].get(cat, "")
+        if cat == optional_cat and not val:
+            continue
         problems[cat] = st.text_area(
             cat,
             value=val,
@@ -472,15 +505,15 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
     with col_back:
         if is_edit:
-            if st.button("← 返回报告列表", use_container_width=True):
+            if st.button("← 返回报告列表", width='stretch'):
                 return "back"
         else:
-            if st.button("← 返回Dashboard", use_container_width=True):
+            if st.button("← 返回Dashboard", width='stretch'):
                 return "back"
 
     with col_save:
         submit_text = "💾 保存修改" if is_edit else "💾 生成报告"
-        submitted = st.button(submit_text, use_container_width=True, type="primary")
+        submitted = st.button(submit_text, width='stretch', type="primary")
 
         if submitted:
             if not selected_lines:

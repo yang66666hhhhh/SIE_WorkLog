@@ -25,7 +25,7 @@ def render_natural_language_query(df, key_prefix="nlq"):
 
     cols = st.columns(len(suggestions[:3]))
     for idx, suggestion in enumerate(suggestions[:3]):
-        if cols[idx].button(suggestion, key=f"{key_prefix}_suggest_{idx}", use_container_width=True):
+        if cols[idx].button(suggestion, key=f"{key_prefix}_suggest_{idx}", width='stretch'):
             st.session_state[selected_key] = suggestion
             st.rerun()
 
@@ -37,4 +37,4 @@ def render_natural_language_query(df, key_prefix="nlq"):
     if result.empty:
         st.info("没有匹配结果")
     else:
-        st.dataframe(result.head(100), use_container_width=True, hide_index=True)
+        st.dataframe(result.head(100), width='stretch', hide_index=True)

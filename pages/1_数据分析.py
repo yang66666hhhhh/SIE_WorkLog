@@ -148,11 +148,11 @@ with st.sidebar:
 
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
-                    if st.button("最近7天", use_container_width=True, key="btn_7d"):
+                    if st.button("最近7天", width='stretch', key="btn_7d"):
                         st.session_state.date_filter = [date_max - pd.Timedelta(days=6), date_max]
                         st.rerun()
                 with col_btn2:
-                    if st.button("全范围", use_container_width=True, key="btn_all"):
+                    if st.button("全范围", width='stretch', key="btn_all"):
                         st.session_state.date_filter = [date_min, date_max]
                         st.rerun()
 
@@ -190,7 +190,7 @@ with st.sidebar:
                 st.cache_data.clear()
                 st.rerun()
 
-    if st.button("🔄 重新处理数据", use_container_width=True, type="secondary"):
+    if st.button("🔄 重新处理数据", width='stretch', type="secondary"):
         st.cache_data.clear()
         try:
             process_file()
@@ -301,13 +301,13 @@ with col_left:
     st.markdown("**工时趋势**")
     st.markdown('<div class="chart-note">按日期和来源对比每日投入，适合观察峰值和阶段性变化。</div>', unsafe_allow_html=True)
     fig = create_daily_bar_chart(df)
-    st.plotly_chart(fig, use_container_width=True, config=get_chart_config())
+    st.plotly_chart(fig, width='stretch', config=get_chart_config())
 
 with col_right:
     st.markdown("**任务类型分布**")
     st.markdown('<div class="chart-note">显示当前筛选范围内，各任务类型消耗的工时占比。</div>', unsafe_allow_html=True)
     fig_pie = create_task_pie_chart(df)
-    st.plotly_chart(fig_pie, use_container_width=True, config=get_chart_config())
+    st.plotly_chart(fig_pie, width='stretch', config=get_chart_config())
 
 render_section_title("🔧", "设备与任务")
 
@@ -316,17 +316,17 @@ with col_mid_left:
     st.markdown("**设备工时分布**")
     st.markdown('<div class="chart-note">横向对比设备/线体投入，快速识别主要工作对象。</div>', unsafe_allow_html=True)
     fig_dev = create_device_bar_chart(df)
-    st.plotly_chart(fig_dev, use_container_width=True, config=get_chart_config())
+    st.plotly_chart(fig_dev, width='stretch', config=get_chart_config())
 
 with col_mid_right:
     st.markdown("**每日任务构成**")
     st.markdown('<div class="chart-note">观察每天的任务类型组合，判断工作内容是否集中或分散。</div>', unsafe_allow_html=True)
     fig_stack = create_stack_bar_chart(df)
-    st.plotly_chart(fig_stack, use_container_width=True, config=get_chart_config())
+    st.plotly_chart(fig_stack, width='stretch', config=get_chart_config())
 
 render_section_title("📅", "周工时热力图")
 fig_heat = create_heatmap(df)
-st.plotly_chart(fig_heat, use_container_width=True, config=get_chart_config())
+st.plotly_chart(fig_heat, width='stretch', config=get_chart_config())
 st.caption("💤 灰色 = 休息日 | 颜色深浅 = 工时")
 
 # =====================
@@ -347,25 +347,25 @@ col_config = {
 
 with tab1:
     d = st.selectbox("选择日期", sorted(df["日期"].dt.date.unique()), key="date_select")
-    st.dataframe(df_show[df_show["日期"].dt.date == d], use_container_width=True, hide_index=True, column_config=col_config)
+    st.dataframe(df_show[df_show["日期"].dt.date == d], width='stretch', hide_index=True, column_config=col_config)
 
 with tab2:
     dev = st.selectbox("选择设备", df["线体/设备"].unique(), key="device_select")
     dev_df = df_show[df["线体/设备"] == dev]
     st.metric("设备总工时", f"{dev_df['工时'].sum():.1f}h")
-    st.dataframe(dev_df, use_container_width=True, hide_index=True, column_config=col_config)
+    st.dataframe(dev_df, width='stretch', hide_index=True, column_config=col_config)
 
 with tab3:
     task_type_sel = st.selectbox("选择任务类型", df["任务类型"].unique(), key="type_select")
     type_df = df_show[df["任务类型"] == task_type_sel]
     st.metric("类型总工时", f"{type_df['工时'].sum():.1f}h")
-    st.dataframe(type_df, use_container_width=True, hide_index=True, column_config=col_config)
+    st.dataframe(type_df, width='stretch', hide_index=True, column_config=col_config)
 
 with tab4:
     src = st.selectbox("选择来源", df["来源"].unique(), key="source_select")
     src_df = df_show[df["来源"] == src]
     st.metric("来源总工时", f"{src_df['工时'].sum():.1f}h")
-    st.dataframe(src_df, use_container_width=True, hide_index=True, column_config=col_config)
+    st.dataframe(src_df, width='stretch', hide_index=True, column_config=col_config)
 
 with st.expander("💬 自然语言查询", expanded=False):
     render_natural_language_query(df_show, key_prefix="worklog_nlq")
@@ -415,16 +415,16 @@ if search:
 else:
     st.caption(f"当前筛选范围共 {len(df_display)} 条任务")
 
-st.dataframe(df_display, use_container_width=True, hide_index=True, height=350, column_config=col_config)
+st.dataframe(df_display, width='stretch', hide_index=True, height=350, column_config=col_config)
 
 col_csv, col_excel = st.columns(2)
 with col_csv:
     csv = df[show_cols].to_csv(index=False).encode("utf-8")
-    st.download_button("📥 导出 CSV", csv, f"工作数据_{pd.Timestamp.now().strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True)
+    st.download_button("📥 导出 CSV", csv, f"工作数据_{pd.Timestamp.now().strftime('%Y%m%d')}.csv", mime="text/csv", width='stretch')
 
 with col_excel:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df[show_cols].to_excel(writer, sheet_name="工作数据", index=False)
     excel_data = output.getvalue()
-    st.download_button("📥 导出 Excel", excel_data, f"工作数据_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    st.download_button("📥 导出 Excel", excel_data, f"工作数据_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", width='stretch')
