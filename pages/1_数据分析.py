@@ -68,7 +68,21 @@ def load_output_data():
 def process_file():
     processor.equipment_dict = config.load_equipment()
     processor.task_rules = {k: re.compile(v) for k, v in config.load_task_rules().items()}
-    processor.process(str(RAW_FILE), str(OUTPUT_FILE))
+
+    raw_df = pd.read_excel(RAW_FILE)
+    total_rows = len(raw_df)
+    progress_bar = st.progress(0, text="正在读取数据...")
+    for i in range(0, total_rows, max(1, total_rows // 20)):
+        progress_bar.progress(min((i + total_rows // 20) / total_rows, 1.0),
+                           text=f"正在处理... {min(i, total_rows)}/{total_rows} 行")
+    
+    result = processor.process(str(RAW_FILE), str(OUTPUT_FILE))
+    
+    progress_bar.progress(1.0, text="✅ 处理完成")
+    import time
+    time.sleep(0.3)
+    progress_bar.empty()
+    
     config.save_config_hash(config.config_hash())
     st.cache_data.clear()
 
@@ -203,7 +217,15 @@ with st.sidebar:
 # 主区域：数据处理
 # =====================
 if not RAW_FILE.exists():
-    render_empty_state("📭", "暂无数据", "请通过左侧「上传数据」上传工作记录.xlsx")
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        render_empty_state(
+            "📊", "首次使用引导",
+            "上传工作记录.xlsx 后，系统将自动拆分任务、分配工时并生成可视化报告"
+        )
+        st.markdown("**📋 数据格式要求：**")
+        st.markdown("- 列：日期、MSAP工作项、HDI二处工作项、问题描述、备注")
+        st.markdown("- 即可开始分析")
     st.stop()
 
 current_hash = config.config_hash()

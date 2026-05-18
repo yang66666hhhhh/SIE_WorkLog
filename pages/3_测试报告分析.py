@@ -269,12 +269,16 @@ def render_analysis_page():
     st.title("📋 自动化测试报告分析")
 
     processor = get_test_report_processor()
-    df = processor.process_all()
+
+    with st.spinner("正在加载报告数据..."):
+        df = processor.process_all()
 
     if df.empty:
-        render_empty_state("📭", "暂无测试报告", "点击下方按钮创建第一份报告")
-        if st.button("➕ 创建报告", type="primary", width='stretch'):
-            st.switch_page("pages/4_新建报告.py")
+        col_l, col_c, col_r = st.columns([1, 2, 1])
+        with col_c:
+            render_empty_state("📋", "暂无测试报告", "点击下方按钮创建第一份报告")
+            if st.button("➕ 创建报告", type="primary", width='stretch'):
+                st.switch_page("pages/4_新建报告.py")
         st.stop()
 
     # =====================
@@ -318,7 +322,13 @@ def render_analysis_page():
     daily_stats = build_daily_stats(filtered_problem_df)
 
     if filtered_reports.empty:
-        render_empty_state("🔍", "没有匹配的测试报告", "请调整日期或线体筛选条件")
+        col_l, col_c, col_r = st.columns([1, 2, 1])
+        with col_c:
+            render_empty_state("🔍", "没有匹配的测试报告", "请调整日期或线体筛选条件")
+            if st.button("🔄 重置筛选", width='stretch'):
+                st.session_state.report_date_filter = []
+                st.session_state.report_line_filter = []
+                st.rerun()
         return
 
     hours_series = (
