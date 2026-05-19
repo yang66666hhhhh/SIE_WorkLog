@@ -8,19 +8,23 @@ from pathlib import Path
 from utils.config import Config
 from utils import report_db
 from utils.test_report_format import (
-    REPORT_CATEGORIES,
     NUMBERED_MARKERS,
     split_report_block_items,
     parse_problem_summary_to_map,
+    get_categories,
 )
 _config = Config()
 LINE_OPTIONS = list(_config.load_equipment().keys())
 REPORT_DIR = Path("report")
-CATEGORIES = REPORT_CATEGORIES
+
+
+def current_categories():
+    return get_categories()
 
 
 def parse_report_to_form(report_data):
     """将报告数据解析为表单格式"""
+    categories = current_categories()
     form_data = {
         "report_date": report_data.get("日期", ""),
         "selected_lines": report_data.get("线体", "").split(", ") if report_data.get("线体") else [],
@@ -29,7 +33,7 @@ def parse_report_to_form(report_data):
         "today_plans": [],
         "actual_scenes": [],
         "processes": [],
-        "problems": {cat: "" for cat in CATEGORIES},
+        "problems": {cat: "" for cat in categories},
         "todo_item": "",
         "test_results": [],
         "completions": [],
@@ -82,7 +86,7 @@ def parse_report_to_form(report_data):
 
     problem_summary = report_data.get("问题汇总", "")
     if problem_summary:
-        form_data["problems"] = parse_problem_summary_to_map(problem_summary, CATEGORIES)
+        form_data["problems"] = parse_problem_summary_to_map(problem_summary, categories)
 
     return form_data
 
@@ -135,6 +139,7 @@ def calculate_time_periods(time_periods):
 def generate_report_content(date_str, lines, time_periods, work_order, today_plans,
                            actual_scenes, processes, problems, todo_item,
                            test_results, completions, next_plan_scene, next_plan_processes, coordination):
+    categories = current_categories()
     total_minutes, time_display_parts = calculate_time_periods(time_periods)
 
     total_hours = total_minutes / 60.0
@@ -172,7 +177,7 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
         content_parts.append("【流程】")
 
     content_parts.append("【问题汇总】")
-    for cat in CATEGORIES:
+    for cat in categories:
         content = problems.get(cat, "").strip()
         if not content or content == "无":
             content_parts.append(f"\t{cat}：无")
@@ -218,6 +223,7 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
     is_edit = mode == "edit"
     title = "✏️ 编辑报告" if is_edit else "📝 新建报告"
     form_key = f"{mode}:{original_filename or 'new'}"
+    categories = current_categories()
 
     draft_key = f"draft_{form_key}"
 
@@ -241,7 +247,7 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
                 "today_plans": [],
                 "actual_scenes": [],
                 "processes": [],
-                "problems": {cat: "" for cat in CATEGORIES},
+                "problems": {cat: "" for cat in categories},
                 "todo_item": "",
                 "test_results": [],
                 "completions": [],
@@ -388,7 +394,7 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
     st.subheader("⚠️ 问题汇总")
     problems = {}
     optional_cat = "生产/工艺"
-    for cat in CATEGORIES:
+    for cat in categories:
         val = form_data["problems"].get(cat, "")
         if cat == optional_cat and not val:
             continue

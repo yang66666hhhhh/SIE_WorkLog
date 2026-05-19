@@ -33,6 +33,12 @@ class Config:
         "enabled": False
     }
 
+    DEFAULT_REPORT_FORMAT_CONFIG = {
+        "version": "v1",
+        "custom_field_labels": {},
+        "custom_categories": []
+    }
+
     DEFAULT_PROJECT_NAME = "胜宏科技HDI二处工业物联网平台实施项目2026"
 
     _CONFIG_REGISTRY = {
@@ -126,6 +132,12 @@ class Config:
         if "api_key" in save_data and save_data["api_key"]:
             save_data["api_key"] = self._obfuscate(save_data["api_key"])
         self._save_config("ai_config.json", save_data)
+
+    def load_report_format_config(self) -> dict:
+        return self._cached_load("report_format.json", "DEFAULT_REPORT_FORMAT_CONFIG")
+
+    def save_report_format_config(self, data: dict):
+        self._save_config("report_format.json", data)
 
     def load_project_name(self) -> str:
         path = self._config_path("project.json")

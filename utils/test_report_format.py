@@ -1,39 +1,80 @@
-"""测试报告格式定义与辅助函数。
-
-后续如果测试报告字段名、问题模块、序号规则变化，优先只改这里。
-"""
+"""测试报告格式定义、版本解析与辅助函数。"""
 import re
+from copy import deepcopy
 
-REPORT_CATEGORIES = [
-    "投收板机",
-    "自动化物流（海康）",
-    "主线设备",
-    "软件集成（SIE）",
-    "生产/工艺",
-    "生产",
-    "工艺",
-    "维护",
-    "IT",
-]
+from utils.config import Config
 
-REPORT_PROBLEM_MODULES = REPORT_CATEGORIES + ["其他"]
 NUMBERED_MARKERS = ("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩")
 
-FIELD_LABELS = {
-    "date": "日期",
-    "lines": "线体",
-    "today_plan": "今日计划",
-    "duration": "测试总时长",
-    "actual_scene": "实际场景",
-    "work_order": "工单",
-    "process": "流程",
-    "problem_summary": "问题汇总",
-    "todo": "待办项",
-    "test_result": "测试结果",
-    "completion": "今日计划实际是否完成",
-    "tomorrow_plan": "明日计划",
-    "coordination": "需要协调事项",
+REPORT_FORMATS = {
+    "v1": {
+        "categories": ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"],
+        "field_labels": {
+            "date": "日期",
+            "lines": "线体",
+            "today_plan": "今日计划",
+            "duration": "测试总时长",
+            "actual_scene": "实际场景",
+            "work_order": "工单",
+            "process": "流程",
+            "problem_summary": "问题汇总",
+            "todo": "待办项",
+            "test_result": "测试结果",
+            "completion": "今日计划实际是否完成",
+            "tomorrow_plan": "明日计划",
+            "coordination": "需要协调事项",
+        },
+    },
+    "v2": {
+        "categories": ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"],
+        "field_labels": {
+            "date": "日期",
+            "lines": "线体",
+            "today_plan": "今日计划",
+            "duration": "测试总时长",
+            "actual_scene": "实际场景",
+            "work_order": "工单",
+            "process": "流程",
+            "problem_summary": "问题汇总",
+            "todo": "待办项",
+            "test_result": "测试结果",
+            "completion": "今日计划实际是否完成",
+            "tomorrow_plan": "明日计划",
+            "coordination": "需要协调事项",
+        },
+    },
 }
+
+
+def load_active_report_format():
+    cfg = Config().load_report_format_config()
+    version = cfg.get("version", "v1")
+    if version == "custom":
+        base = deepcopy(REPORT_FORMATS["v1"])
+    else:
+        base = deepcopy(REPORT_FORMATS.get(version, REPORT_FORMATS["v1"]))
+
+    custom_categories = cfg.get("custom_categories", [])
+    custom_labels = cfg.get("custom_field_labels", {})
+    if custom_categories:
+        base["categories"] = custom_categories
+    if custom_labels:
+        base["field_labels"].update(custom_labels)
+    base["problem_modules"] = base["categories"] + ["其他"]
+    base["version"] = version
+    return base
+
+
+def get_categories():
+    return load_active_report_format()["categories"]
+
+
+def get_problem_modules():
+    return load_active_report_format()["problem_modules"]
+
+
+def get_field_labels():
+    return load_active_report_format()["field_labels"]
 
 
 def is_numbered_line(text: str) -> bool:
@@ -70,7 +111,7 @@ def split_report_block_items(value) -> list:
 
 
 def parse_problem_summary_to_map(summary: str, categories=None) -> dict:
-    categories = categories or REPORT_CATEGORIES
+    categories = categories or get_categories()
     result = {cat: "" for cat in categories}
     if not summary:
         return result
@@ -101,3 +142,13 @@ def parse_problem_summary_to_map(summary: str, categories=None) -> dict:
         if combined and combined != "无":
             result[current_cat] = combined
     return result
+
+
+def validate_report_content(content: str):
+    fmt = load_active_report_format()
+    labels = fmt["field_labels"]
+    missing = []
+    for label in labels.values():
+        if f"【{label}】" not in content and label not in (labels["coordination"],):
+            missing.append(label)
+    return {"ok": len(missing) == 0, "missing_fields": missing, "version": fmt["version"]}
