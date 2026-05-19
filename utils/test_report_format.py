@@ -152,3 +152,9 @@ def validate_report_content(content: str):
         if f"【{label}】" not in content and label not in (labels["coordination"],):
             missing.append(label)
     return {"ok": len(missing) == 0, "missing_fields": missing, "version": fmt["version"]}
+
+
+# backward-compatible exports for existing imports
+REPORT_CATEGORIES = get_categories()
+REPORT_PROBLEM_MODULES = get_problem_modules()
+FIELD_LABELS = get_field_labels()
