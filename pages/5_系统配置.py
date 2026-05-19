@@ -6,13 +6,82 @@ from html import escape
 from datetime import datetime
 from utils.config import Config
 from utils import report_db
-from utils.styles import inject_global_css, render_section_title, render_top_nav
-from utils.test_report_format import get_available_version_options, load_active_report_format
-from utils.report_form import generate_report_content
+from utils.styles import inject_global_css, render_section_title
+from utils.test_report_format import (
+    get_available_version_options, load_active_report_format,
+    get_available_versions, get_template_types,
+    get_active_config_for_type, load_active_format_for_type,
+    get_issue_keys, get_issue_label_map, build_issue_labels,
+    TEMPLATE_TYPES,
+)
+
+
+def _generate_test_report_preview(fmt, sample_problems):
+    labels = fmt.get("field_labels", {})
+    cats = fmt.get("categories", [])
+    lines = []
+    lines.append(f"【{labels.get('date', '日期')}】2026-05-19")
+    lines.append(f"【{labels.get('today_plan', '今日计划')}】垂直电镀VCP1自动化测试（放板机）")
+    lines.append(f"【{labels.get('duration', '测试总时长')}】6.0小时（09:30-12:00, 14:30-18:00）")
+    lines.append(f"【{labels.get('actual_scene', '实际场景')}】自动化测试：VCP1（测试环境）")
+    lines.append(f"【{labels.get('work_order', '工单')}】M126041900006，共3528 PCS")
+    lines.append(f"【{labels.get('process', '流程')}】叫料→AGV送料→TrackIn")
+    lines.append(f"【{labels.get('problem_summary', '问题汇总')}】")
+    for cat in cats:
+        content = sample_problems.get(cat, "无")
+        lines.append(f"\t{cat}：{content}")
+    lines.append(f"【{labels.get('todo', '待办项')}】待确认现场网络稳定性")
+    lines.append(f"【{labels.get('test_result', '测试结果')}】放板流程已跑通")
+    lines.append(f"【{labels.get('completion', '今日计划实际是否完成')}】已完成 ✅")
+    lines.append(f"【{labels.get('tomorrow_plan', '明日计划')}】")
+    lines.append("测试场景：VCP1/VCP2线放板机全流程（测试环境）")
+    lines.append(f"{labels.get('coordination', '需要协调事项')}：需要IT协助")
+    return "\n".join(lines)
+
+
+def _generate_joint_debug_preview(fmt):
+    labels = fmt.get("field_labels", {})
+    issue_keys = fmt.get("issue_keys", [])
+    issue_label_map = fmt.get("issue_label_map", {})
+    vendors = {"machine": "成泰", "logistics": "海康", "main": "主线", "sie": "SIE", "other": ""}
+    result_labels = build_issue_labels(vendors, "joint_debug_summary")
+    lines = []
+    lines.append("{05/19}内层前处理八线(数采，配方下发，自动化)测试进度汇总：")
+    lines.append("计划完成日期：05/19")
+    lines.append("实际开始联调日期：05/19")
+    lines.append("状态：测试中，完成")
+    lines.append("生产线可测试时间总计3.5小时：")
+    lines.append("明细时间段：14:30 - 18:00")
+    lines.append("")
+    lines.append("测试场景：（正式环境）内层前处理八线放板机全流程")
+    lines.append("")
+    lines.append("明细流程：")
+    lines.append("设备叫料，AGV送料，AGV安全交互，配方下发，放板请求，TrackIn，退空载，AGV取空载，AGV送空载入线边仓全流程")
+    lines.append("")
+    lines.append("现场正式工单LOT号：")
+    lines.append("D626051101480、D626051101481；总计960PCS")
+    lines.append("")
+    lines.append("问题汇总：")
+    for key in issue_keys:
+        label = result_labels.get(key, issue_label_map.get(key, key))
+        lines.append(f"{label}：无")
+    lines.append("待办项：无")
+    lines.append("")
+    lines.append("明日的测试计划：内层前处理八线(数采，配方下发，自动化)测试")
+    lines.append("测试场景：内层前处理八线收放板机全流程测试")
+    lines.append("明细流程：")
+    lines.append("放板机：设备叫料，AGV送料，AGV安全交互，配方下发，放板请求，TrackIn，退空载，AGV取空载，AGV送空载入线边仓全流程")
+    lines.append("收板机：叫空载，AGV安全交互，接收批次配方信息，TrackOut，退满载，AGV取满载，AGV送满载入库")
+    lines.append("")
+    lines.append("需要协调事项：无")
+    for key in issue_keys:
+        label = result_labels.get(key, issue_label_map.get(key, key))
+        lines.append(f"明日{label}：无")
+    lines.append("明日待办项：无")
+    return "\n".join(lines)
 
 st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️", menu_items=None)
 inject_global_css()
-render_top_nav("系统配置")
 
 config = Config()
 
@@ -124,7 +193,160 @@ with tab_proj:
 # 报告格式配置
 # =====================
 with tab_format:
-    render_section_title("📝", "测试报告格式配置")
+    render_section_title("📝", "模板格式配置")
+
+    fmt_tab1, fmt_tab2 = st.tabs(["📋 测试报告", "📝 联调总结"])
+
+    # ----- test_report -----
+    with fmt_tab1:
+        st.markdown("**模板类型：** `test_report`")
+        full_config = config.load_report_format_config()
+        test_cfg = full_config.get("test_report", {"version": "v1", "custom_field_labels": {}, "custom_categories": []})
+
+        tt_versions = get_available_version_options("test_report")
+        tt_current = test_cfg.get("version", "v1")
+        tt_idx = tt_versions.index(tt_current) if tt_current in tt_versions else 0
+
+        sel_version = st.selectbox("格式版本", options=tt_versions, index=tt_idx, key="tr_fmt_ver")
+
+        preview_tt_cfg = {
+            "version": sel_version,
+            "custom_categories": [],
+            "custom_field_labels": {},
+        }
+        fmt = load_active_format_for_type("test_report", version=sel_version, custom_config=preview_tt_cfg)
+
+        col_ti1, col_ti2 = st.columns([1, 2])
+        with col_ti1:
+            st.markdown(f"**版本：** `{fmt.get('version', 'v1')}`")
+            cats = fmt.get("categories", [])
+            st.markdown(f"**问题分类数：** `{len(cats)}`")
+            st.markdown(f"**字段数：** `{len(fmt.get('field_labels', {}))}`")
+        with col_ti2:
+            st.markdown("字段列表：")
+            for k, v in fmt.get("field_labels", {}).items():
+                st.markdown(f"- `{k}` → {v}")
+
+        if sel_version == "custom":
+            with st.expander("🔧 自定义分类", expanded=False):
+                custom_cats = test_cfg.get("custom_categories", [])
+                custom_cats_str = st.text_area(
+                    "自定义问题分类（每行一个）",
+                    value="\n".join(custom_cats) if custom_cats else "",
+                    height=120,
+                    key="tr_custom_cats",
+                )
+                parsed_cats = [c.strip() for c in custom_cats_str.split("\n") if c.strip()]
+
+                custom_labels = test_cfg.get("custom_field_labels", {})
+                st.markdown("**自定义字段标签**")
+                custom_labels_edit = {}
+                for fkey, flabel in fmt.get("field_labels", {}).items():
+                    default_label = custom_labels.get(fkey, flabel)
+                    new_label = st.text_input(f"字段 {fkey}", value=default_label, key=f"tr_cl_{fkey}")
+                    if new_label != flabel:
+                        custom_labels_edit[fkey] = new_label
+
+                preview_tt_cfg = {
+                    "version": sel_version,
+                    "custom_categories": parsed_cats,
+                    "custom_field_labels": custom_labels_edit,
+                }
+                fmt = load_active_format_for_type("test_report", version=sel_version, custom_config=preview_tt_cfg)
+
+        preview_cats = fmt.get("categories", [])
+        preview_problems = {cat: ("示例问题1\n示例问题2" if i == 0 else "无") for i, cat in enumerate(preview_cats)}
+        preview_content = _generate_test_report_preview(fmt, preview_problems)
+
+        with st.expander("👁️ 测试报告格式预览", expanded=True):
+            st.text_area("预览", value=preview_content, height=350, disabled=True, label_visibility="collapsed")
+
+        if st.button("💾 保存测试报告格式", type="primary", key="btn_tr_fmt_save"):
+            save_data = dict(full_config)
+            save_data["test_report"] = {
+                "version": sel_version,
+                "custom_categories": test_cfg.get("custom_categories", []) if sel_version != "custom" else parsed_cats,
+                "custom_field_labels": test_cfg.get("custom_field_labels", {}) if sel_version != "custom" else custom_labels_edit,
+            }
+            config.save_report_format_config(save_data)
+            st.toast("✅ 测试报告格式已保存", icon="✅")
+            st.rerun()
+
+    # ----- joint_debug_summary -----
+    with fmt_tab2:
+        st.markdown("**模板类型：** `joint_debug_summary`")
+        full_config = config.load_report_format_config()
+        jd_cfg = full_config.get("joint_debug_summary", {"version": "v1", "custom_field_labels": {}, "custom_categories": []})
+
+        jd_versions = get_available_version_options("joint_debug_summary")
+        jd_current = jd_cfg.get("version", "v1")
+        jd_idx = jd_versions.index(jd_current) if jd_current in jd_versions else 0
+
+        sel_jd_version = st.selectbox("格式版本", options=jd_versions, index=jd_idx, key="jd_fmt_ver")
+
+        preview_jd_cfg = {
+            "version": sel_jd_version,
+            "custom_categories": [],
+            "custom_field_labels": {},
+        }
+        jd_fmt = load_active_format_for_type("joint_debug_summary", version=sel_jd_version, custom_config=preview_jd_cfg)
+
+        col_ji1, col_ji2 = st.columns([1, 2])
+        with col_ji1:
+            st.markdown(f"**版本：** `{jd_fmt.get('version', 'v1')}`")
+            st.markdown(f"**问题分类数：** `{len(jd_fmt.get('issue_keys', []))}`")
+            st.markdown(f"**字段数：** `{len(jd_fmt.get('field_labels', {}))}`")
+        with col_ji2:
+            st.markdown("字段列表：")
+            for k, v in jd_fmt.get("field_labels", {}).items():
+                st.markdown(f"- `{k}` → {v}")
+            st.markdown("问题分类 key：")
+            for k in jd_fmt.get("issue_keys", []):
+                st.markdown(f"- `{k}`")
+
+        if sel_jd_version == "custom":
+            with st.expander("🔧 自定义分类", expanded=False):
+                custom_cats_jd = jd_cfg.get("custom_categories", [])
+                custom_cats_jd_str = st.text_area(
+                    "自定义问题分类（每行一个）",
+                    value="\n".join(custom_cats_jd) if custom_cats_jd else "",
+                    height=120,
+                    key="jd_custom_cats",
+                )
+                parsed_jd_cats = [c.strip() for c in custom_cats_jd_str.split("\n") if c.strip()]
+
+                custom_labels_jd = jd_cfg.get("custom_field_labels", {})
+                st.markdown("**自定义字段标签**")
+                custom_labels_jd_edit = {}
+                for fkey, flabel in jd_fmt.get("field_labels", {}).items():
+                    default_label = custom_labels_jd.get(fkey, flabel)
+                    new_label = st.text_input(f"字段 {fkey}", value=default_label, key=f"jd_cl_{fkey}")
+                    if new_label != flabel:
+                        custom_labels_jd_edit[fkey] = new_label
+
+                preview_jd_cfg = {
+                    "version": sel_jd_version,
+                    "custom_categories": parsed_jd_cats,
+                    "custom_field_labels": custom_labels_jd_edit,
+                }
+                jd_fmt = load_active_format_for_type("joint_debug_summary", version=sel_jd_version, custom_config=preview_jd_cfg)
+
+        jd_preview = _generate_joint_debug_preview(jd_fmt)
+        with st.expander("👁️ 联调总结格式预览", expanded=True):
+            st.text_area("预览", value=jd_preview, height=350, disabled=True, label_visibility="collapsed")
+
+        if st.button("💾 保存联调总结格式", type="primary", key="btn_jd_fmt_save"):
+            save_data = dict(full_config)
+            save_data["joint_debug_summary"] = {
+                "version": sel_jd_version,
+                "custom_categories": jd_cfg.get("custom_categories", []) if sel_jd_version != "custom" else parsed_jd_cats,
+                "custom_field_labels": jd_cfg.get("custom_field_labels", {}) if sel_jd_version != "custom" else custom_labels_jd_edit,
+            }
+            config.save_report_format_config(save_data)
+            st.toast("✅ 联调总结格式已保存", icon="✅")
+            st.rerun()
+
+    st.info("💡 分别配置测试报告和联调总结的版本与自定义选项，保存后对应新建/编辑页面会自动使用新格式。")
 
     report_format_config = config.load_report_format_config()
     current_version = report_format_config.get("version", "v1")

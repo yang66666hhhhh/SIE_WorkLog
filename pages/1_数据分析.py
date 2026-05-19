@@ -15,7 +15,7 @@ from utils.charts import (
 )
 from utils.styles import (
     inject_global_css, render_kpi_card, render_section_title,
-    render_empty_state, render_top_nav, PRIMARY, SUCCESS, WARNING, DANGER, INFO, NEUTRAL,
+    render_empty_state, PRIMARY, SUCCESS, WARNING, DANGER, INFO, NEUTRAL,
 )
 
 MAX_UPLOAD_SIZE_MB = 10
@@ -50,7 +50,6 @@ def get_processor():
 
 st.set_page_config(page_title="Data Analysis", layout="wide", menu_items=None)
 inject_global_css()
-render_top_nav("数据分析")
 
 config = get_config()
 processor = get_processor()

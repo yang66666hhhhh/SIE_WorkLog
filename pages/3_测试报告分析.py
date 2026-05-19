@@ -15,7 +15,6 @@ from utils.styles import (
 
 st.set_page_config(page_title="测试报告分析", layout="wide", page_icon="📋", menu_items=None)
 inject_global_css()
-render_top_nav("测试报告")
 
 
 @st.cache_resource

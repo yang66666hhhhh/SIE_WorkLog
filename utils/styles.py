@@ -17,13 +17,6 @@ SOURCE_COLORS = {"MSAP": PRIMARY, "HDI二处": WARNING}
 
 
 def inject_global_css():
-    st.html("""
-    <style>
-        [data-testid="stSidebarNav"], [data-testid="stSidebarNavLinks"] {
-            display: none !important;
-        }
-    </style>
-    """)
     st.markdown("""
     <style>
         [data-testid="stSidebar"] {
@@ -422,25 +415,67 @@ def render_sidebar_nav(current_page="首页"):
         is_active = name == current_page
         btn_type = "primary" if is_active else "secondary"
         if st.button(label, type=btn_type, width='stretch', key=f"nav_{page}"):
-            st.switch_page(f"{page}.py")
+            _switch_to(page)
+
+
+def _switch_to(page):
+    import os
+    name = os.path.basename(page)
+    st.switch_page(f"{name}.py")
 
 
 def render_top_nav(current_page="首页"):
-    pages = [
+    _nav_items = [
         ("🏠 首页", "首页", "dashboard"),
         ("📊 数据分析", "数据分析", "pages/1_数据分析"),
         ("🔍 问题追踪", "问题追踪", "pages/2_问题追踪"),
-        ("📋 测试报告", "测试报告", "pages/3_测试报告分析"),
+    ]
+    _expandable_groups = {
+        "📋 测试报告": [
+            ("📄 报告分析", "pages/3_测试报告分析"),
+            ("📝 新建报告", "pages/4_新建报告"),
+        ],
+        "📝 联调总结": [
+            ("📝 新建总结", "pages/6_联调总结"),
+            ("📊 总结分析", "pages/7_联调总结分析"),
+        ],
+    }
+    _fixed_items = [
         ("⚙️ 系统配置", "系统配置", "pages/5_系统配置"),
     ]
-    cols = st.columns(len(pages))
-    for idx, (label, name, page) in enumerate(pages):
-        with cols[idx]:
+    total = len(_nav_items) + len(_expandable_groups) + len(_fixed_items)
+    col_widths = [1, 1, 1, 2, 2, 1]
+    cols = st.columns(col_widths)
+    ci = 0
+    for label, name, page in _nav_items:
+        with cols[ci]:
             if name == current_page:
-                st.button(label, key=f"topnav_{page}", type="primary", width='stretch', disabled=True)
+                st.button(label, key=f"nav_{page}", type="primary", width='stretch', disabled=True)
             else:
-                if st.button(label, key=f"topnav_{page}", width='stretch'):
-                    st.switch_page(f"{page}.py")
+                if st.button(label, key=f"nav_{page}", width='stretch'):
+                    _switch_to(page)
+        ci += 1
+    for group_label, sub_items in _expandable_groups.items():
+        with cols[ci]:
+            is_active = any(p.endswith(current_page) for _, p in sub_items)
+            exp_label = group_label + (" ▼" if is_active else "")
+            with st.expander(exp_label, expanded=is_active):
+                for sub_label, sub_page in sub_items:
+                    is_sub = sub_page.endswith(current_page)
+                    if is_sub:
+                        st.button(f"▶ {sub_label}", key=f"sub_{sub_page}", type="primary", width='stretch', disabled=True)
+                    else:
+                        if st.button(f"　 {sub_label}", key=f"sub_{sub_page}", width='stretch'):
+                            _switch_to(sub_page)
+        ci += 1
+    for label, name, page in _fixed_items:
+        with cols[ci]:
+            if name == current_page:
+                st.button(label, key=f"nav_{page}", type="primary", width='stretch', disabled=True)
+            else:
+                if st.button(label, key=f"nav_{page}", width='stretch'):
+                    _switch_to(page)
+        ci += 1
 
 
 def render_problem_card(line_name, status, description, date=None):

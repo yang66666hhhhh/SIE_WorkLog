@@ -8,11 +8,10 @@ from utils.problem_tracker import (
     PROBLEM_STATES
 )
 from utils.test_report_format import get_categories
-from utils.styles import inject_global_css, render_top_nav
+from utils.styles import inject_global_css
 
 st.set_page_config(page_title="问题追踪", layout="wide", page_icon="🔍", menu_items=None)
 inject_global_css()
-render_top_nav("问题追踪")
 
 
 def render_tracker_problem_card(p: dict, show_history: bool = False):
