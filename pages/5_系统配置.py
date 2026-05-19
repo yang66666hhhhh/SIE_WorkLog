@@ -7,7 +7,7 @@ from datetime import datetime
 from utils.config import Config
 from utils import report_db
 from utils.styles import inject_global_css, render_section_title, render_top_nav
-from utils.test_report_format import get_available_versions, load_active_report_format
+from utils.test_report_format import get_available_version_options, load_active_report_format
 
 st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️", menu_items=None)
 inject_global_css()
@@ -58,9 +58,11 @@ if st.session_state.config_msg:
 with st.expander("💾 配置备份", expanded=False):
     equipment = config.load_equipment()
     task_rules = config.load_task_rules()
+    report_format = config.load_report_format_config()
     backup_data = {
         "equipment": equipment,
         "task_rules": task_rules,
+        "report_format": report_format,
         "backup_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     backup_json = json.dumps(backup_data, ensure_ascii=False, indent=2)
@@ -80,6 +82,8 @@ with st.expander("💾 配置备份", expanded=False):
             if "equipment" in restore_data and "task_rules" in restore_data:
                 config.save_equipment(restore_data["equipment"])
                 config.save_task_rules(restore_data["task_rules"])
+                if "report_format" in restore_data:
+                    config.save_report_format_config(restore_data["report_format"])
                 st.toast("✅ 配置已导入", icon="✅")
                 st.rerun()
             else:
@@ -123,14 +127,14 @@ with tab_format:
 
     report_format_config = config.load_report_format_config()
     current_version = report_format_config.get("version", "v1")
-    available_versions = get_available_versions()
+    available_versions = get_available_version_options()
 
     col_fv1, col_fv2 = st.columns([1, 2])
     with col_fv1:
         selected_version = st.selectbox(
             "格式版本",
-            options=["v1", "v2", "custom"],
-            index=["v1", "v2", "custom"].index(current_version) if current_version in ["v1", "v2", "custom"] else 0,
+            options=available_versions,
+            index=available_versions.index(current_version) if current_version in available_versions else 0,
             key="report_format_version"
         )
 

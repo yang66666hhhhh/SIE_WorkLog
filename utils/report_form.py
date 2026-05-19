@@ -12,6 +12,7 @@ from utils.test_report_format import (
     split_report_block_items,
     parse_problem_summary_to_map,
     get_categories,
+    get_format_option,
 )
 _config = Config()
 LINE_OPTIONS = list(_config.load_equipment().keys())
@@ -116,6 +117,24 @@ def format_numbered_items(items):
     return [f"\t{chr(9311 + i)} {item}" for i, item in enumerate(items, 1)]
 
 
+def append_report_block(content_parts, title, items):
+    items = [item for item in items if str(item).strip()]
+    force_numbered = bool(get_format_option("number_prefix_required", False))
+
+    if force_numbered:
+        content_parts.append(f"【{title}】")
+        if items:
+            content_parts.extend(format_numbered_items(items))
+        return
+
+    if len(items) == 1:
+        content_parts.append(f"【{title}】{items[0]}")
+    else:
+        content_parts.append(f"【{title}】")
+        if items:
+            content_parts.extend(format_numbered_items(items))
+
+
 def calculate_time_periods(time_periods):
     """计算时间段总分钟数和展示文本。"""
     total_minutes = 0
@@ -148,33 +167,15 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
     content_parts = []
     content_parts.append(f"【日期】{date_str}")
 
-    if len(today_plans) == 1:
-        content_parts.append(f"【今日计划】{today_plans[0]}")
-    elif len(today_plans) > 1:
-        content_parts.append("【今日计划】")
-        content_parts.extend(format_numbered_items(today_plans))
-    else:
-        content_parts.append("【今日计划】")
+    append_report_block(content_parts, "今日计划", today_plans)
 
     content_parts.append(f"【测试总时长】{time_display}")
 
-    if len(actual_scenes) == 1:
-        content_parts.append(f"【实际场景】{actual_scenes[0]}")
-    elif len(actual_scenes) > 1:
-        content_parts.append("【实际场景】")
-        content_parts.extend(format_numbered_items(actual_scenes))
-    else:
-        content_parts.append("【实际场景】")
+    append_report_block(content_parts, "实际场景", actual_scenes)
 
     content_parts.append(f"【工单】{work_order if work_order else '无'}")
 
-    if len(processes) == 1:
-        content_parts.append(f"【流程】{processes[0]}")
-    elif len(processes) > 1:
-        content_parts.append("【流程】")
-        content_parts.extend(format_numbered_items(processes))
-    else:
-        content_parts.append("【流程】")
+    append_report_block(content_parts, "流程", processes)
 
     content_parts.append("【问题汇总】")
     for cat in categories:
@@ -191,21 +192,9 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
 
     content_parts.append(f"【待办项】{todo_item if todo_item else '无'}")
 
-    if len(test_results) == 1:
-        content_parts.append(f"【测试结果】{test_results[0]}")
-    elif len(test_results) > 1:
-        content_parts.append("【测试结果】")
-        content_parts.extend(format_numbered_items(test_results))
-    else:
-        content_parts.append("【测试结果】")
+    append_report_block(content_parts, "测试结果", test_results)
 
-    if len(completions) == 1:
-        content_parts.append(f"【今日计划实际是否完成】{completions[0]}")
-    elif len(completions) > 1:
-        content_parts.append("【今日计划实际是否完成】")
-        content_parts.extend(format_numbered_items(completions))
-    else:
-        content_parts.append("【今日计划实际是否完成】")
+    append_report_block(content_parts, "今日计划实际是否完成", completions)
 
     content_parts.append("【明日计划】")
     content_parts.append(f"测试场景：{next_plan_scene if next_plan_scene else ''}")

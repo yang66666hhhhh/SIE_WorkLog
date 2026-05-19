@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from html import escape
-from pathlib import Path
 from utils import report_db
 from utils.test_report_processor import TestReportProcessor
 from utils.report_form import render_report_form
-from utils.test_report_format import REPORT_PROBLEM_MODULES, NUMBERED_MARKERS, split_line_names
+from utils.test_report_format import get_problem_modules, NUMBERED_MARKERS, split_line_names
 from utils.styles import (
     inject_global_css, render_kpi_card, render_section_title,
     render_empty_state, render_top_nav, render_problem_card,
@@ -51,14 +50,11 @@ def build_daily_stats_cached(problem_df):
     return build_daily_stats(problem_df)
 
 
-PROBLEM_MODULES = REPORT_PROBLEM_MODULES
-
-
 def normalize_problem_summary(summary):
     if summary is None or pd.isna(summary):
         return ""
     text = str(summary)
-    for module in PROBLEM_MODULES:
+    for module in get_problem_modules():
         text = text.replace(f" · {module}：", f"\n{module}：")
         text = text.replace(f" · {module}:", f"\n{module}:")
     for marker in NUMBERED_MARKERS:
@@ -453,8 +449,7 @@ def render_analysis_page():
             else:
                 st.markdown(f"**共 {len(filtered_problem_df)} 条问题**")
                 by_dept = filtered_problem_df.groupby("来源")
-                dept_order = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）",
-                            "生产/工艺", "生产", "工艺", "维护", "IT", "其他"]
+                dept_order = get_problem_modules()
                 for dept in dept_order:
                     if dept not in by_dept.groups:
                         continue

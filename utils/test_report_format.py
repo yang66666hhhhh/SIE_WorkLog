@@ -52,6 +52,10 @@ def get_available_versions():
     return list(REPORT_FORMATS.keys())
 
 
+def get_available_version_options():
+    return get_available_versions() + ["custom"]
+
+
 def load_active_report_format():
     cfg = Config().load_report_format_config()
     version = cfg.get("version", "v1")
@@ -81,6 +85,10 @@ def get_problem_modules():
 
 def get_field_labels():
     return load_active_report_format()["field_labels"]
+
+
+def get_format_option(name: str, default=None):
+    return load_active_report_format().get(name, default)
 
 
 def is_numbered_line(text: str) -> bool:
