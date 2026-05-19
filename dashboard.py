@@ -24,7 +24,7 @@ OUTPUT_FILE = Path("任务级数据.xlsx")
 REPORT_DIR = Path("report")
 
 has_data = OUTPUT_FILE.exists()
-has_reports = REPORT_DIR.exists() and any(f.suffix == ".txt" and "模板" not in f.name for f in REPORT_DIR.glob("*.txt"))
+has_reports = REPORT_DIR.exists() and any(f.suffix == ".txt" for f in REPORT_DIR.glob("*.txt"))
 
 task_count = 0
 total_hours = 0.0
@@ -39,7 +39,7 @@ if has_data:
 report_count = 0
 if has_reports:
     try:
-        report_count = len([f for f in REPORT_DIR.glob("*.txt") if "模板" not in f.name])
+        report_count = len([f for f in REPORT_DIR.glob("*.txt")])
     except Exception:
         pass
 

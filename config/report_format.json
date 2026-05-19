@@ -1,5 +1,5 @@
 {
-  "version": "v1",
-  "custom_field_labels": {},
-  "custom_categories": []
+  "version": "v2",
+  "custom_categories": [],
+  "custom_field_labels": {}
 }

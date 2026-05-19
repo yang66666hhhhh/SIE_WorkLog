@@ -36,8 +36,8 @@ config/ai_config.json
 config/config_hash.txt
 config/project.json
 
-# Report data
-report/
+# Report data (已启用版本控制)
+# report/
 
 # Temp
 tmp/

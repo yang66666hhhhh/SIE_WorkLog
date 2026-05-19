@@ -176,8 +176,6 @@ class TestReportProcessor:
 
         reports = []
         for file in self.REPORT_DIR.glob("*.txt"):
-            if "模板" in file.name:
-                continue
             try:
                 report = self.parse_report(file)
                 reports.append(report)

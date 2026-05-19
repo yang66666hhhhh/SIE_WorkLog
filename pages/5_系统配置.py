@@ -7,6 +7,7 @@ from datetime import datetime
 from utils.config import Config
 from utils import report_db
 from utils.styles import inject_global_css, render_section_title, render_top_nav
+from utils.test_report_format import get_available_versions, load_active_report_format
 
 st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️", menu_items=None)
 inject_global_css()
@@ -98,7 +99,7 @@ ai_config = config.load_ai_config()
 
 render_config_overview(project_name, equipment, task_rules, ai_config)
 
-tab_proj, tab_ai, tab_eq, tab_tr, tab_data = st.tabs(["📌 项目", "🤖 AI 配置", "🏢 设备线体", "📋 任务类型", "💾 数据管理"])
+tab_proj, tab_format, tab_ai, tab_eq, tab_tr, tab_data = st.tabs(["📌 项目", "📝 报告格式", "🤖 AI 配置", "🏢 设备线体", "📋 任务类型", "💾 数据管理"])
 
 # =====================
 # 项目配置
@@ -113,6 +114,64 @@ with tab_proj:
             st.rerun()
         else:
             st.warning("项目名称不能为空")
+
+# =====================
+# 报告格式配置
+# =====================
+with tab_format:
+    render_section_title("📝", "测试报告格式配置")
+
+    report_format_config = config.load_report_format_config()
+    current_version = report_format_config.get("version", "v1")
+    available_versions = get_available_versions()
+
+    col_fv1, col_fv2 = st.columns([1, 2])
+    with col_fv1:
+        selected_version = st.selectbox(
+            "格式版本",
+            options=["v1", "v2", "custom"],
+            index=["v1", "v2", "custom"].index(current_version) if current_version in ["v1", "v2", "custom"] else 0,
+            key="report_format_version"
+        )
+
+    fmt = load_active_report_format()
+    with col_fv2:
+        st.markdown(f"**当前版本：** `{fmt.get('version', 'v1')}`")
+        st.markdown(f"**问题分类数：** {len(fmt.get('categories', []))}")
+        st.markdown(f"**字段数：** {len(fmt.get('field_labels', {}))}")
+
+    if selected_version == "custom":
+        with st.expander("🔧 自定义分类", expanded=False):
+            custom_cats = report_format_config.get("custom_categories", [])
+            custom_cats_str = st.text_area(
+                "自定义问题分类（每行一个）",
+                value="\n".join(custom_cats) if custom_cats else "",
+                height=150,
+                key="custom_categories_input"
+            )
+            parsed_cats = [c.strip() for c in custom_cats_str.split("\n") if c.strip()]
+
+            custom_labels = report_format_config.get("custom_field_labels", {})
+            st.markdown("**自定义字段标签**")
+            custom_labels_edit = {}
+            for fkey, flabel in fmt.get("field_labels", {}).items():
+                new_label = st.text_input(f"字段 {fkey}", value=flabel, key=f"custom_label_{fkey}")
+                if new_label != flabel:
+                    custom_labels_edit[fkey] = new_label
+
+    if st.button("💾 保存格式配置", type="primary", key="btn_format_save"):
+        save_data = {"version": selected_version}
+        if selected_version == "custom":
+            save_data["custom_categories"] = parsed_cats
+            save_data["custom_field_labels"] = custom_labels_edit
+        else:
+            save_data["custom_categories"] = []
+            save_data["custom_field_labels"] = {}
+        config.save_report_format_config(save_data)
+        st.toast("✅ 报告格式配置已保存", icon="✅")
+        st.rerun()
+
+    st.info("💡 切换格式版本后，新建/编辑报告将使用对应版本的字段和分类规则。")
 
 # =====================
 # AI 配置

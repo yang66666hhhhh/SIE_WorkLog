@@ -14,6 +14,7 @@ REPORT_FORMATS = {
             "lines": "线体",
             "today_plan": "今日计划",
             "duration": "测试总时长",
+
             "actual_scene": "实际场景",
             "work_order": "工单",
             "process": "流程",
@@ -42,8 +43,13 @@ REPORT_FORMATS = {
             "tomorrow_plan": "明日计划",
             "coordination": "需要协调事项",
         },
+        "number_prefix_required": True,
     },
 }
+
+
+def get_available_versions():
+    return list(REPORT_FORMATS.keys())
 
 
 def load_active_report_format():
@@ -154,7 +160,7 @@ def validate_report_content(content: str):
     return {"ok": len(missing) == 0, "missing_fields": missing, "version": fmt["version"]}
 
 
-# backward-compatible exports for existing imports
-REPORT_CATEGORIES = get_categories()
-REPORT_PROBLEM_MODULES = get_problem_modules()
-FIELD_LABELS = get_field_labels()
+# backward-compatible exports (deprecated - loaded once at import time with v1 defaults)
+REPORT_CATEGORIES = REPORT_FORMATS["v1"]["categories"]
+REPORT_PROBLEM_MODULES = REPORT_FORMATS["v1"]["categories"] + ["其他"]
+FIELD_LABELS = REPORT_FORMATS["v1"]["field_labels"]
