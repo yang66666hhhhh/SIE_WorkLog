@@ -586,12 +586,12 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
 
                 file_path = REPORT_DIR / save_filename
                 try:
+                    lines_str = ", ".join(selected_lines)
+                    report_db.report_to_db(save_filename, date_str, lines_str, content)
+
                     REPORT_DIR.mkdir(exist_ok=True)
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(content)
-
-                    lines_str = ", ".join(selected_lines)
-                    report_db.report_to_db(save_filename, date_str, lines_str, content)
 
                     if draft_key in st.session_state:
                         del st.session_state[draft_key]
@@ -600,6 +600,10 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
                     st.balloons()
                     return save_filename
                 except Exception as e:
+                    try:
+                        report_db.delete_report(save_filename)
+                    except Exception:
+                        pass
                     st.error(f"❌ 保存失败：{e}")
     if not is_edit:
         st.session_state[draft_key] = {

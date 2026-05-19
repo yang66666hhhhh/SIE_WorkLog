@@ -15,7 +15,7 @@ from utils.charts import (
 )
 from utils.styles import (
     inject_global_css, render_kpi_card, render_section_title,
-    render_empty_state, render_sidebar_nav, PRIMARY, SUCCESS, WARNING, DANGER, INFO, NEUTRAL,
+    render_empty_state, render_top_nav, PRIMARY, SUCCESS, WARNING, DANGER, INFO, NEUTRAL,
 )
 
 MAX_UPLOAD_SIZE_MB = 10
@@ -25,8 +25,13 @@ ALLOWED_EXTENSIONS = {"xlsx"}
 @st.cache_data(ttl=3600)
 def load_data(file_path):
     try:
-        df = pd.read_excel(file_path, engine="openpyxl")
-        df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
+        path = Path(file_path)
+        if path.suffix.lower() == ".parquet":
+            df = pd.read_parquet(path)
+        else:
+            df = pd.read_excel(path, engine="openpyxl")
+        if "日期" in df.columns:
+            df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
         return df
     except Exception as e:
         st.error(f"❌ 数据加载失败: {e}")
@@ -45,18 +50,22 @@ def get_processor():
 
 st.set_page_config(page_title="Data Analysis", layout="wide", menu_items=None)
 inject_global_css()
+render_top_nav("数据分析")
 
 config = get_config()
 processor = get_processor()
 
 RAW_FILE = Path("工作记录.xlsx")
 OUTPUT_FILE = Path("任务级数据.xlsx")
+PARQUET_FILE = Path("任务级数据.parquet")
 
 
 def load_output_data():
-    if not OUTPUT_FILE.exists():
-        return pd.DataFrame()
-    return load_data(str(OUTPUT_FILE))
+    if PARQUET_FILE.exists():
+        return load_data(str(PARQUET_FILE))
+    if OUTPUT_FILE.exists():
+        return load_data(str(OUTPUT_FILE))
+    return pd.DataFrame()
 
 
 def process_file():
@@ -70,6 +79,8 @@ def process_file():
         progress_bar.progress(pct, text=f"正在处理... {current}/{total} 行")
 
     result = processor.process(str(RAW_FILE), str(OUTPUT_FILE), progress_callback=progress_callback)
+    if result is not None and not result.empty:
+        result.to_parquet(PARQUET_FILE, index=False)
 
     progress_bar.progress(1.0, text="✅ 处理完成")
 
@@ -129,56 +140,95 @@ def render_rank_list(title, data, name_col, value_col="工时", max_rows=5, colo
 
 
 # =====================
-# 侧边栏：导航 + 筛选 + 上传 + 操作
+# 主区域：数据处理
+# =====================
+if not RAW_FILE.exists():
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        render_empty_state(
+            "📊", "首次使用引导",
+            "上传工作记录.xlsx 后，系统将自动拆分任务、分配工时并生成可视化报告"
+        )
+        st.markdown("**📋 数据格式要求：**")
+        st.markdown("- 列：日期、MSAP工作项、HDI二处工作项、问题描述、备注")
+        st.markdown("- 即可开始分析")
+    st.stop()
+
+current_hash = config.config_hash()
+saved_hash = config.load_config_hash()
+need_process = current_hash != saved_hash or not OUTPUT_FILE.exists() or not PARQUET_FILE.exists()
+
+if need_process:
+    label = "⚙️ 配置变更检测中..." if current_hash != saved_hash else "📝 首次处理数据..."
+    with st.status(label, expanded=True) as status:
+        try:
+            process_file()
+            status.update(label="✅ 处理完成", state="complete")
+        except Exception as e:
+            status.update(label=f"❌ 处理失败: {e}", state="error")
+            st.stop()
+
+with st.spinner("📊 加载数据中..."):
+    df = load_output_data()
+
+if df.empty:
+    render_empty_state("📭", "数据为空", "处理后的数据为空，请检查原始数据文件")
+    st.stop()
+
+# 首次进入时初始化默认筛选，避免依赖执行顺序
+if "source_filter" not in st.session_state:
+    st.session_state.source_filter = df["来源"].dropna().unique().tolist() if "来源" in df.columns else []
+if "device_filter" not in st.session_state:
+    st.session_state.device_filter = df["线体/设备"].dropna().unique().tolist() if "线体/设备" in df.columns else []
+if "task_type_filter" not in st.session_state:
+    st.session_state.task_type_filter = df["任务类型"].dropna().unique().tolist() if "任务类型" in df.columns else []
+if "date_filter" not in st.session_state:
+    date_min = df["日期"].min().date()
+    date_max = df["日期"].max().date()
+    st.session_state.date_filter = [date_min, date_max]
+
+# 统一从 session_state 读取筛选结果
+source = st.session_state.source_filter
+device = st.session_state.device_filter
+task_type = st.session_state.task_type_filter
+date_range = st.session_state.date_filter
+if len(date_range) == 2:
+    start_date, end_date = date_range
+else:
+    start_date = end_date = date_range[0]
+
+# =====================
+# 侧边栏：筛选 + 上传 + 操作
 # =====================
 with st.sidebar:
-    render_sidebar_nav("数据分析")
-    st.divider()
-
     st.markdown('<p class="sidebar-title">🔍 筛选条件</p>', unsafe_allow_html=True)
 
-    if not RAW_FILE.exists() and not OUTPUT_FILE.exists():
-        st.info("请先上传数据文件")
-    else:
-        if OUTPUT_FILE.exists():
-            df_preview = load_output_data()
-        else:
-            df_preview = pd.DataFrame()
+    date_min = df["日期"].min().date()
+    date_max = df["日期"].max().date()
+    days_diff = (date_max - date_min).days
 
-        if not df_preview.empty:
-            with st.expander("📅 时间范围", expanded=True):
-                date_min, date_max = df_preview["日期"].min().date(), df_preview["日期"].max().date()
-                days_diff = (date_max - date_min).days
+    with st.expander("📅 时间范围", expanded=True):
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("最近7天", width='stretch', key="btn_7d"):
+                st.session_state.date_filter = [date_max - pd.Timedelta(days=6), date_max]
+                st.rerun()
+        with col_btn2:
+            if st.button("全范围", width='stretch', key="btn_all"):
+                st.session_state.date_filter = [date_min, date_max]
+                st.rerun()
 
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.button("最近7天", width='stretch', key="btn_7d"):
-                        st.session_state.date_filter = [date_max - pd.Timedelta(days=6), date_max]
-                        st.rerun()
-                with col_btn2:
-                    if st.button("全范围", width='stretch', key="btn_all"):
-                        st.session_state.date_filter = [date_min, date_max]
-                        st.rerun()
+        st.date_input("选择日期", value=st.session_state.date_filter, key="date_filter")
+        st.caption(f"数据范围: {date_min} ~ {date_max} ({days_diff}天)")
 
-                default_val = [date_min, date_max]
-                if "date_filter" in st.session_state:
-                    default_val = st.session_state.date_filter
+    with st.expander("🏢 来源", expanded=False):
+        st.multiselect("来源", df["来源"].dropna().unique().tolist(), default=st.session_state.source_filter, key="source_filter")
 
-                date_range = st.date_input("选择日期", value=default_val, key="date_filter")
-                if len(date_range) == 2:
-                    start_date, end_date = date_range
-                else:
-                    start_date = end_date = date_range[0]
-                st.caption(f"数据范围: {date_min} ~ {date_max} ({days_diff}天)")
+    with st.expander("⚙️ 设备", expanded=False):
+        st.multiselect("设备", df["线体/设备"].dropna().unique().tolist(), default=st.session_state.device_filter, key="device_filter")
 
-            with st.expander("🏢 来源", expanded=False):
-                source = st.multiselect("来源", df_preview["来源"].unique(), default=df_preview["来源"].unique(), key="source_filter")
-
-            with st.expander("⚙️ 设备", expanded=False):
-                device = st.multiselect("设备", df_preview["线体/设备"].unique(), default=df_preview["线体/设备"].unique(), key="device_filter")
-
-            with st.expander("📋 任务类型", expanded=False):
-                task_type = st.multiselect("任务类型", df_preview["任务类型"].unique(), default=df_preview["任务类型"].unique(), key="task_type_filter")
+    with st.expander("📋 任务类型", expanded=False):
+        st.multiselect("任务类型", df["任务类型"].dropna().unique().tolist(), default=st.session_state.task_type_filter, key="task_type_filter")
 
     st.divider()
 
@@ -202,46 +252,6 @@ with st.sidebar:
             st.rerun()
         except Exception as e:
             st.error(f"处理失败: {e}")
-
-# =====================
-# 主区域：数据处理
-# =====================
-if not RAW_FILE.exists():
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
-        render_empty_state(
-            "📊", "首次使用引导",
-            "上传工作记录.xlsx 后，系统将自动拆分任务、分配工时并生成可视化报告"
-        )
-        st.markdown("**📋 数据格式要求：**")
-        st.markdown("- 列：日期、MSAP工作项、HDI二处工作项、问题描述、备注")
-        st.markdown("- 即可开始分析")
-    st.stop()
-
-current_hash = config.config_hash()
-saved_hash = config.load_config_hash()
-need_process = current_hash != saved_hash or not OUTPUT_FILE.exists()
-
-if need_process:
-    label = "⚙️ 配置变更检测中..." if current_hash != saved_hash else "📝 首次处理数据..."
-    with st.status(label, expanded=True) as status:
-        try:
-            process_file()
-            status.update(label="✅ 处理完成", state="complete")
-        except Exception as e:
-            status.update(label=f"❌ 处理失败: {e}", state="error")
-            st.stop()
-
-with st.spinner("📊 加载数据中..."):
-    df = load_output_data()
-
-if df.empty:
-    render_empty_state("📭", "数据为空", "处理后的数据为空，请检查原始数据文件")
-    st.stop()
-
-# 应用筛选
-if "source_filter" not in st.session_state:
-    st.stop()
 
 df = df[
     (df["日期"] >= pd.to_datetime(start_date))

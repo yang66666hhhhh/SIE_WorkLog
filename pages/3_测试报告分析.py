@@ -3,23 +3,51 @@ import pandas as pd
 import plotly.graph_objects as go
 from html import escape
 from pathlib import Path
-from utils.config import Config  # noqa: F401
+from utils import report_db
 from utils.test_report_processor import TestReportProcessor
 from utils.report_form import render_report_form
 from utils.styles import (
     inject_global_css, render_kpi_card, render_section_title,
-    render_empty_state, render_sidebar_nav, render_problem_card,
+    render_empty_state, render_top_nav, render_problem_card,
     PRIMARY, SUCCESS, WARNING, DANGER, INFO,
     STATUS_COLORS, STATUS_ICONS, LINE_COLORS,
 )
 
 st.set_page_config(page_title="测试报告分析", layout="wide", page_icon="📋", menu_items=None)
 inject_global_css()
+render_top_nav("测试报告")
 
 
 @st.cache_resource
 def get_test_report_processor():
     return TestReportProcessor()
+
+
+@st.cache_data(ttl=300)
+def load_reports_snapshot(db_mtime_ns=0, db_size=0):
+    processor = get_test_report_processor()
+    return processor.process_all()
+
+
+@st.cache_data(ttl=300)
+def load_problem_detail_cached(df):
+    processor = get_test_report_processor()
+    return processor.get_problem_detail(df)
+
+
+@st.cache_data(ttl=300)
+def explode_problem_lines_cached(problem_df):
+    return explode_problem_lines(problem_df)
+
+
+@st.cache_data(ttl=300)
+def summarize_problem_stats_cached(problem_df):
+    return summarize_problem_stats(problem_df)
+
+
+@st.cache_data(ttl=300)
+def build_daily_stats_cached(problem_df):
+    return build_daily_stats(problem_df)
 
 
 PROBLEM_MODULES = [
@@ -270,8 +298,15 @@ def render_analysis_page():
 
     processor = get_test_report_processor()
 
+    db_mtime_ns = 0
+    db_size = 0
+    if report_db.DB_PATH.exists():
+        stat = report_db.DB_PATH.stat()
+        db_mtime_ns = stat.st_mtime_ns
+        db_size = stat.st_size
+
     with st.spinner("正在加载报告数据..."):
-        df = processor.process_all()
+        df = load_reports_snapshot(db_mtime_ns, db_size)
 
     if df.empty:
         col_l, col_c, col_r = st.columns([1, 2, 1])
@@ -293,8 +328,6 @@ def render_analysis_page():
     # 侧边栏筛选
     # =====================
     with st.sidebar:
-        render_sidebar_nav("测试报告")
-        st.divider()
         st.markdown('<p class="sidebar-title">🔍 筛选条件</p>', unsafe_allow_html=True)
 
         with st.expander("📅 日期范围", expanded=True):
@@ -315,11 +348,11 @@ def render_analysis_page():
 
     report_mask = df["日期"].isin(selected_dates) & df["线体"].apply(lambda value: line_intersects(value, selected_lines))
     filtered_reports = df[report_mask].copy()
-    problem_df = processor.get_problem_detail(filtered_reports)
+    problem_df = load_problem_detail_cached(filtered_reports)
     filtered_problem_df = problem_df[problem_df["状态"].isin(selected_status)].copy()
-    problem_df_by_line = explode_problem_lines(filtered_problem_df)
-    stats = summarize_problem_stats(filtered_problem_df)
-    daily_stats = build_daily_stats(filtered_problem_df)
+    problem_df_by_line = explode_problem_lines_cached(filtered_problem_df)
+    stats = summarize_problem_stats_cached(filtered_problem_df)
+    daily_stats = build_daily_stats_cached(filtered_problem_df)
 
     if filtered_reports.empty:
         col_l, col_c, col_r = st.columns([1, 2, 1])

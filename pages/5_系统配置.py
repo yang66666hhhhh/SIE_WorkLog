@@ -6,10 +6,11 @@ from html import escape
 from datetime import datetime
 from utils.config import Config
 from utils import report_db
-from utils.styles import inject_global_css, render_section_title, render_sidebar_nav
+from utils.styles import inject_global_css, render_section_title, render_top_nav
 
 st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️", menu_items=None)
 inject_global_css()
+render_top_nav("系统配置")
 
 config = Config()
 
@@ -53,46 +54,37 @@ if st.session_state.config_msg:
     st.toast(msg_text, icon="✅" if msg_type == st.success else "⚠️")
     st.session_state.config_msg = None
 
-# =====================
-# 侧边栏
-# =====================
-with st.sidebar:
-    render_sidebar_nav("系统配置")
-    st.divider()
-    st.header("⚙️ 系统")
-    st.caption("主题: 右上角 ⋮ 菜单")
+with st.expander("💾 配置备份", expanded=False):
+    equipment = config.load_equipment()
+    task_rules = config.load_task_rules()
+    backup_data = {
+        "equipment": equipment,
+        "task_rules": task_rules,
+        "backup_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    backup_json = json.dumps(backup_data, ensure_ascii=False, indent=2)
 
-    with st.expander("💾 配置备份", expanded=True):
-        equipment = config.load_equipment()
-        task_rules = config.load_task_rules()
-        backup_data = {
-            "equipment": equipment,
-            "task_rules": task_rules,
-            "backup_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        backup_json = json.dumps(backup_data, ensure_ascii=False, indent=2)
+    st.download_button(
+        "📥 导出配置",
+        backup_json,
+        f"config_{datetime.now().strftime('%Y%m%d')}.json",
+        mime="application/json",
+        width='stretch'
+    )
 
-        st.download_button(
-            "📥 导出配置",
-            backup_json,
-            f"config_{datetime.now().strftime('%Y%m%d')}.json",
-            mime="application/json",
-            width='stretch'
-        )
-
-        uploaded = st.file_uploader("📤 导入配置", type=["json"], key="restore_config")
-        if uploaded:
-            try:
-                restore_data = json.load(uploaded)
-                if "equipment" in restore_data and "task_rules" in restore_data:
-                    config.save_equipment(restore_data["equipment"])
-                    config.save_task_rules(restore_data["task_rules"])
-                    st.toast("✅ 配置已导入", icon="✅")
-                    st.rerun()
-                else:
-                    st.error("❌ 格式错误：缺少 equipment 或 task_rules 字段")
-            except Exception as e:
-                st.error(f"❌ 导入失败: {e}")
+    uploaded = st.file_uploader("📤 导入配置", type=["json"], key="restore_config")
+    if uploaded:
+        try:
+            restore_data = json.load(uploaded)
+            if "equipment" in restore_data and "task_rules" in restore_data:
+                config.save_equipment(restore_data["equipment"])
+                config.save_task_rules(restore_data["task_rules"])
+                st.toast("✅ 配置已导入", icon="✅")
+                st.rerun()
+            else:
+                st.error("❌ 格式错误：缺少 equipment 或 task_rules 字段")
+        except Exception as e:
+            st.error(f"❌ 导入失败: {e}")
 
 # =====================
 # 主区域：Tab 分区

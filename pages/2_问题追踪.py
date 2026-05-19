@@ -3,18 +3,16 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.problem_tracker import (
-    load_problems, add_problem, update_problem_status, delete_problem,
-    search_problems, get_pending_problems, get_weekly_summary,
+    add_problem, update_problem_status, delete_problem,
+    search_problems, count_problems, get_weekly_summary,
     PROBLEM_STATES
 )
 from utils.report_form import CATEGORIES
-from utils.styles import inject_global_css, render_sidebar_nav
+from utils.styles import inject_global_css, render_top_nav
 
 st.set_page_config(page_title="问题追踪", layout="wide", page_icon="🔍", menu_items=None)
 inject_global_css()
-
-with st.sidebar:
-    render_sidebar_nav("问题追踪")
+render_top_nav("问题追踪")
 
 
 def render_tracker_problem_card(p: dict, show_history: bool = False):
@@ -45,25 +43,24 @@ with tab_list:
     with col_search3:
         cat_filter = st.selectbox("部门", ["全部"] + CATEGORIES, key="prob_cat_filter")
 
-    all_probs = search_problems(
-        keyword=kw,
-        status="" if status_filter == "全部" else status_filter,
-        category="" if cat_filter == "全部" else cat_filter
-    )
+    query_status = "" if status_filter == "全部" else status_filter
+    query_category = "" if cat_filter == "全部" else cat_filter
+    total = count_problems(keyword=kw, status=query_status, category=query_category)
+    st.caption(f"共 {total} 条问题")
 
-    st.caption(f"共 {len(all_probs)} 条问题")
-
-    if not all_probs:
+    if total == 0:
         st.info("暂无问题记录")
 
     PAGE_SIZE = 10
-    total = len(all_probs)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    page = st.selectbox(f"共 {total_pages} 页", range(1, total_pages + 1), index=total_pages - 1)
-
-    start = (page - 1) * PAGE_SIZE
-    end = min(start + PAGE_SIZE, total)
-    page_probs = all_probs[start:end]
+    page = st.selectbox(f"共 {total_pages} 页", range(1, total_pages + 1), index=0)
+    page_probs = search_problems(
+        keyword=kw,
+        status=query_status,
+        category=query_category,
+        page=page,
+        page_size=PAGE_SIZE,
+    )
 
     for p in page_probs:
         with st.container():

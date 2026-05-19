@@ -425,6 +425,24 @@ def render_sidebar_nav(current_page="首页"):
             st.switch_page(f"{page}.py")
 
 
+def render_top_nav(current_page="首页"):
+    pages = [
+        ("🏠 首页", "首页", "dashboard"),
+        ("📊 数据分析", "数据分析", "pages/1_数据分析"),
+        ("🔍 问题追踪", "问题追踪", "pages/2_问题追踪"),
+        ("📋 测试报告", "测试报告", "pages/3_测试报告分析"),
+        ("⚙️ 系统配置", "系统配置", "pages/5_系统配置"),
+    ]
+    cols = st.columns(len(pages))
+    for idx, (label, name, page) in enumerate(pages):
+        with cols[idx]:
+            if name == current_page:
+                st.button(label, key=f"topnav_{page}", type="primary", width='stretch', disabled=True)
+            else:
+                if st.button(label, key=f"topnav_{page}", width='stretch'):
+                    st.switch_page(f"{page}.py")
+
+
 def render_problem_card(line_name, status, description, date=None):
     sc = STATUS_COLORS.get(status, "#888")
     lc = LINE_COLORS.get(line_name, "#888")

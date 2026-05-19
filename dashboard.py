@@ -2,15 +2,13 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 from utils.styles import (
-    inject_global_css, render_kpi_card, render_section_title, render_sidebar_nav,
+    inject_global_css, render_kpi_card, render_section_title, render_top_nav,
     PRIMARY, SUCCESS, WARNING, INFO,
 )
 
 st.set_page_config(page_title="Work Analytics", layout="wide", page_icon="📊", menu_items=None)
 inject_global_css()
-
-with st.sidebar:
-    render_sidebar_nav("首页")
+render_top_nav("首页")
 
 st.markdown("""
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">

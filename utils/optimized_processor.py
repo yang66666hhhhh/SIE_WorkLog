@@ -77,8 +77,8 @@ class OptimizedWorkRecordProcessor(WorkRecordProcessor):
                         }
                     )
 
-        if progress_callback and idx % max(1, total_rows // 20) == 0:
-            progress_callback(idx, total_rows)
+            if progress_callback and (idx == 0 or (idx + 1) % max(1, total_rows // 20) == 0 or (idx + 1) == total_rows):
+                progress_callback(idx + 1, total_rows)
 
         df_task = pd.DataFrame(rows)
         if df_task.empty:
