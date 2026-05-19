@@ -1,6 +1,7 @@
 """测试报告 SQLite 数据库模块"""
 import sqlite3
 import json
+import re
 import shutil
 from pathlib import Path
 from datetime import datetime
@@ -65,8 +66,25 @@ def row_to_dict(row):
     return dict(row)
 
 
+def migrate_legacy_problem_category_content(content: str) -> str:
+    if not content or "生产/工艺" not in content:
+        return content
+
+    pattern = re.compile(r"^(\s*)生产/工艺[：:](.*)$", re.MULTILINE)
+
+    def replace_match(match):
+        indent = match.group(1)
+        value = match.group(2).strip()
+        if not value or value == "无":
+            return f"{indent}生产：无\n{indent}工艺：无"
+        return f"{indent}生产：无\n{indent}工艺：{value}"
+
+    return pattern.sub(replace_match, content)
+
+
 def report_to_db(filename: str, date: str, lines: str, content: str, format_version: str = "v1") -> int:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    content = migrate_legacy_problem_category_content(content)
     conn = get_conn()
     cur = conn.execute(
         "SELECT id FROM reports WHERE filename = ?", (filename,)
@@ -191,7 +209,7 @@ def migrate_from_txt(report_dir: Path = Path("report")):
 
     for txt_file in report_dir.glob("*.txt"):
         try:
-            content = txt_file.read_text(encoding="utf-8")
+            content = migrate_legacy_problem_category_content(txt_file.read_text(encoding="utf-8"))
             filename = txt_file.name
 
             date = ""
@@ -265,7 +283,7 @@ def import_db_json(import_path: Path) -> dict:
                 """INSERT OR REPLACE INTO reports (filename, date, lines, format_version, content, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (r["filename"], r.get("date", ""), r.get("lines", ""), r.get("format_version", "v1"),
-                 r.get("content", ""), r.get("created_at", ""), r.get("updated_at", ""))
+                 migrate_legacy_problem_category_content(r.get("content", "")), r.get("created_at", ""), r.get("updated_at", ""))
             )
             imported_reports += 1
         except Exception:
@@ -288,6 +306,27 @@ def import_db_json(import_path: Path) -> dict:
     conn.commit()
     conn.close()
     return {"reports": imported_reports, "problems": imported_problems}
+
+
+def migrate_legacy_problem_categories_in_db() -> dict:
+    init_db()
+    conn = get_conn()
+    rows = conn.execute("SELECT id, filename, content FROM reports").fetchall()
+    updated = 0
+
+    for row in rows:
+        old_content = row["content"] or ""
+        new_content = migrate_legacy_problem_category_content(old_content)
+        if new_content != old_content:
+            conn.execute(
+                "UPDATE reports SET content=?, updated_at=? WHERE id=?",
+                (new_content, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), row["id"])
+            )
+            updated += 1
+
+    conn.commit()
+    conn.close()
+    return {"updated": updated, "checked": len(rows)}
 
 
 init_db()
