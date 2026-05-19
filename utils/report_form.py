@@ -395,11 +395,8 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
     st.markdown("---")
     st.subheader("⚠️ 问题汇总")
     problems = {}
-    optional_cat = "生产/工艺"
     for cat in categories:
         val = form_data["problems"].get(cat, "")
-        if cat == optional_cat and not val:
-            continue
         problems[cat] = st.text_area(
             cat,
             value=val,
