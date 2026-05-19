@@ -7,7 +7,7 @@ from utils.problem_tracker import (
     search_problems, count_problems, get_weekly_summary,
     PROBLEM_STATES
 )
-from utils.report_form import CATEGORIES
+from utils.test_report_format import get_categories
 from utils.styles import inject_global_css, render_top_nav
 
 st.set_page_config(page_title="问题追踪", layout="wide", page_icon="🔍", menu_items=None)
@@ -41,7 +41,7 @@ with tab_list:
     with col_search2:
         status_filter = st.selectbox("状态", ["全部"] + PROBLEM_STATES, key="prob_status_filter")
     with col_search3:
-        cat_filter = st.selectbox("部门", ["全部"] + CATEGORIES, key="prob_cat_filter")
+        cat_filter = st.selectbox("部门", ["全部"] + get_categories(), key="prob_cat_filter")
 
     query_status = "" if status_filter == "全部" else status_filter
     query_category = "" if cat_filter == "全部" else cat_filter
@@ -100,7 +100,7 @@ with tab_add:
     with col_desc:
         desc = st.text_area("问题描述", placeholder="详细描述问题...", height=100)
     with col_cat:
-        category = st.selectbox("部门", CATEGORIES)
+        category = st.selectbox("部门", get_categories())
     col_line, col_src, col_date = st.columns([1, 1, 1])
     with col_line:
         line = st.text_input("线体", placeholder="VCP1/VCP2/PLB")
