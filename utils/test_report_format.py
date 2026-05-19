@@ -56,9 +56,9 @@ def get_available_version_options():
     return get_available_versions() + ["custom"]
 
 
-def load_active_report_format():
-    cfg = Config().load_report_format_config()
-    version = cfg.get("version", "v1")
+def load_active_report_format(version=None, custom_config=None):
+    cfg = custom_config or Config().load_report_format_config()
+    version = version or cfg.get("version", "v1")
     if version == "custom":
         base = deepcopy(REPORT_FORMATS["v1"])
     else:
@@ -75,20 +75,20 @@ def load_active_report_format():
     return base
 
 
-def get_categories():
-    return load_active_report_format()["categories"]
+def get_categories(version=None, custom_config=None):
+    return load_active_report_format(version=version, custom_config=custom_config)["categories"]
 
 
-def get_problem_modules():
-    return load_active_report_format()["problem_modules"]
+def get_problem_modules(version=None, custom_config=None):
+    return load_active_report_format(version=version, custom_config=custom_config)["problem_modules"]
 
 
-def get_field_labels():
-    return load_active_report_format()["field_labels"]
+def get_field_labels(version=None, custom_config=None):
+    return load_active_report_format(version=version, custom_config=custom_config)["field_labels"]
 
 
-def get_format_option(name: str, default=None):
-    return load_active_report_format().get(name, default)
+def get_format_option(name: str, default=None, version=None, custom_config=None):
+    return load_active_report_format(version=version, custom_config=custom_config).get(name, default)
 
 
 def is_numbered_line(text: str) -> bool:

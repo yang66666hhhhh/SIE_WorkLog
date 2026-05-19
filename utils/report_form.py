@@ -13,14 +13,19 @@ from utils.test_report_format import (
     parse_problem_summary_to_map,
     get_categories,
     get_format_option,
+    load_active_report_format,
 )
 _config = Config()
 LINE_OPTIONS = list(_config.load_equipment().keys())
 REPORT_DIR = Path("report")
 
 
-def current_categories():
-    return get_categories()
+def current_categories(version=None, format_config=None):
+    return get_categories(version=version, custom_config=format_config)
+
+
+def current_format_version():
+    return load_active_report_format().get("version", "v1")
 
 
 def parse_report_to_form(report_data):
@@ -117,9 +122,14 @@ def format_numbered_items(items):
     return [f"\t{chr(9311 + i)} {item}" for i, item in enumerate(items, 1)]
 
 
-def append_report_block(content_parts, title, items):
+def append_report_block(content_parts, title, items, format_version=None, format_config=None):
     items = [item for item in items if str(item).strip()]
-    force_numbered = bool(get_format_option("number_prefix_required", False))
+    force_numbered = bool(get_format_option(
+        "number_prefix_required",
+        False,
+        version=format_version,
+        custom_config=format_config,
+    ))
 
     if force_numbered:
         content_parts.append(f"【{title}】")
@@ -156,28 +166,31 @@ def calculate_time_periods(time_periods):
 
 
 def generate_report_content(date_str, lines, time_periods, work_order, today_plans,
-                           actual_scenes, processes, problems, todo_item,
-                           test_results, completions, next_plan_scene, next_plan_processes, coordination):
-    categories = current_categories()
+                            actual_scenes, processes, problems, todo_item,
+                            test_results, completions, next_plan_scene, next_plan_processes, coordination,
+                            format_version=None, format_config=None):
+    fmt = load_active_report_format(version=format_version, custom_config=format_config)
+    labels = fmt["field_labels"]
+    categories = fmt["categories"]
     total_minutes, time_display_parts = calculate_time_periods(time_periods)
 
     total_hours = total_minutes / 60.0
     time_display = f"{total_hours:.1f}小时（{', '.join(time_display_parts)}）" if time_display_parts else f"{total_hours:.1f}小时"
 
     content_parts = []
-    content_parts.append(f"【日期】{date_str}")
+    content_parts.append(f"【{labels['date']}】{date_str}")
 
-    append_report_block(content_parts, "今日计划", today_plans)
+    append_report_block(content_parts, labels["today_plan"], today_plans, format_version, format_config)
 
-    content_parts.append(f"【测试总时长】{time_display}")
+    content_parts.append(f"【{labels['duration']}】{time_display}")
 
-    append_report_block(content_parts, "实际场景", actual_scenes)
+    append_report_block(content_parts, labels["actual_scene"], actual_scenes, format_version, format_config)
 
-    content_parts.append(f"【工单】{work_order if work_order else '无'}")
+    content_parts.append(f"【{labels['work_order']}】{work_order if work_order else '无'}")
 
-    append_report_block(content_parts, "流程", processes)
+    append_report_block(content_parts, labels["process"], processes, format_version, format_config)
 
-    content_parts.append("【问题汇总】")
+    content_parts.append(f"【{labels['problem_summary']}】")
     for cat in categories:
         content = problems.get(cat, "").strip()
         if not content or content == "无":
@@ -190,20 +203,20 @@ def generate_report_content(date_str, lines, time_periods, work_order, today_pla
                 content_parts.append(f"\t{cat}：")
                 content_parts.extend(format_numbered_items(lines))
 
-    content_parts.append(f"【待办项】{todo_item if todo_item else '无'}")
+    content_parts.append(f"【{labels['todo']}】{todo_item if todo_item else '无'}")
 
-    append_report_block(content_parts, "测试结果", test_results)
+    append_report_block(content_parts, labels["test_result"], test_results, format_version, format_config)
 
-    append_report_block(content_parts, "今日计划实际是否完成", completions)
+    append_report_block(content_parts, labels["completion"], completions, format_version, format_config)
 
-    content_parts.append("【明日计划】")
+    content_parts.append(f"【{labels['tomorrow_plan']}】")
     content_parts.append(f"测试场景：{next_plan_scene if next_plan_scene else ''}")
 
     if next_plan_processes:
         content_parts.append("明细流程：")
         content_parts.extend(format_numbered_items(next_plan_processes))
 
-    content_parts.append(f"需要协调事项：{coordination if coordination else '无'}")
+    content_parts.append(f"{labels['coordination']}：{coordination if coordination else '无'}")
 
     return "\n".join(content_parts)
 
@@ -532,7 +545,13 @@ def render_report_form(report_data=None, mode="create", original_filename=None):
                 file_path = REPORT_DIR / save_filename
                 try:
                     lines_str = ", ".join(selected_lines)
-                    report_db.report_to_db(save_filename, date_str, lines_str, content)
+                    report_db.report_to_db(
+                        save_filename,
+                        date_str,
+                        lines_str,
+                        content,
+                        format_version=current_format_version(),
+                    )
 
                     REPORT_DIR.mkdir(exist_ok=True)
                     with open(file_path, "w", encoding="utf-8") as f:

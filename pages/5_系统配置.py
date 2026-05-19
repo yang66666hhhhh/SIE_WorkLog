@@ -8,6 +8,7 @@ from utils.config import Config
 from utils import report_db
 from utils.styles import inject_global_css, render_section_title, render_top_nav
 from utils.test_report_format import get_available_version_options, load_active_report_format
+from utils.report_form import generate_report_content
 
 st.set_page_config(page_title="System Config", layout="wide", page_icon="⚙️", menu_items=None)
 inject_global_css()
@@ -128,6 +129,8 @@ with tab_format:
     report_format_config = config.load_report_format_config()
     current_version = report_format_config.get("version", "v1")
     available_versions = get_available_version_options()
+    parsed_cats = report_format_config.get("custom_categories", [])
+    custom_labels_edit = {}
 
     col_fv1, col_fv2 = st.columns([1, 2])
     with col_fv1:
@@ -138,7 +141,12 @@ with tab_format:
             key="report_format_version"
         )
 
-    fmt = load_active_report_format()
+    preview_config = {
+        "version": selected_version,
+        "custom_categories": parsed_cats,
+        "custom_field_labels": custom_labels_edit,
+    }
+    fmt = load_active_report_format(version=selected_version, custom_config=preview_config)
     with col_fv2:
         st.markdown(f"**当前版本：** `{fmt.get('version', 'v1')}`")
         st.markdown(f"**问题分类数：** {len(fmt.get('categories', []))}")
@@ -159,9 +167,42 @@ with tab_format:
             st.markdown("**自定义字段标签**")
             custom_labels_edit = {}
             for fkey, flabel in fmt.get("field_labels", {}).items():
-                new_label = st.text_input(f"字段 {fkey}", value=flabel, key=f"custom_label_{fkey}")
+                default_label = custom_labels.get(fkey, flabel)
+                new_label = st.text_input(f"字段 {fkey}", value=default_label, key=f"custom_label_{fkey}")
                 if new_label != flabel:
                     custom_labels_edit[fkey] = new_label
+
+            preview_config = {
+                "version": selected_version,
+                "custom_categories": parsed_cats,
+                "custom_field_labels": custom_labels_edit,
+            }
+            fmt = load_active_report_format(version=selected_version, custom_config=preview_config)
+
+    preview_categories = fmt.get("categories", [])
+    preview_problems = {cat: "示例问题 1\n示例问题 2" if i == 0 else "无" for i, cat in enumerate(preview_categories)}
+    preview_content = generate_report_content(
+        date_str="2026-05-19",
+        lines=["VCP1", "VCP2"],
+        time_periods=[{"start": "09:30", "end": "12:00"}, {"start": "14:30", "end": "18:00"}],
+        work_order="M126041900006，共3528 PCS",
+        today_plans=["垂直电镀VCP1自动化测试（放板机）"],
+        actual_scenes=["自动化测试：VCP1（测试环境）"],
+        processes=["叫料→AGV送料→安全交互→配方下发→TrackIn"],
+        problems=preview_problems,
+        todo_item="待确认现场网络稳定性",
+        test_results=["放板流程已跑通"],
+        completions=["自动化测试：已完成 ✅"],
+        next_plan_scene="VCP1/VCP2线放板机全流程（测试环境）",
+        next_plan_processes=["放板机：叫料→AGV送料→安全交互→配方下发"],
+        coordination="需要IT协助处理网络白名单",
+        format_version=selected_version,
+        format_config=preview_config,
+    )
+
+    with st.expander("👁️ 格式预览", expanded=True):
+        st.caption("下方展示当前所选格式版本生成出的测试报告文本。")
+        st.text_area("预览内容", value=preview_content, height=420, disabled=True, label_visibility="collapsed")
 
     if st.button("💾 保存格式配置", type="primary", key="btn_format_save"):
         save_data = {"version": selected_version}

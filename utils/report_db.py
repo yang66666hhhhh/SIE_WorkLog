@@ -25,6 +25,7 @@ def init_db():
             filename TEXT UNIQUE,
             date TEXT,
             lines TEXT,
+            format_version TEXT,
             content TEXT,
             created_at TEXT,
             updated_at TEXT
@@ -46,6 +47,11 @@ def init_db():
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_date ON reports(date)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_lines ON reports(lines)")
+    existing_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(reports)").fetchall()
+    }
+    if "format_version" not in existing_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN format_version TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_problems_report_id ON problems(report_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_problems_status ON problems(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_problems_category ON problems(category)")
@@ -59,7 +65,7 @@ def row_to_dict(row):
     return dict(row)
 
 
-def report_to_db(filename: str, date: str, lines: str, content: str) -> int:
+def report_to_db(filename: str, date: str, lines: str, content: str, format_version: str = "v1") -> int:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_conn()
     cur = conn.execute(
@@ -68,14 +74,14 @@ def report_to_db(filename: str, date: str, lines: str, content: str) -> int:
     existing = cur.fetchone()
     if existing:
         conn.execute(
-            "UPDATE reports SET date=?, lines=?, content=?, updated_at=? WHERE filename=?",
-            (date, lines, content, now, filename)
+            "UPDATE reports SET date=?, lines=?, format_version=?, content=?, updated_at=? WHERE filename=?",
+            (date, lines, format_version, content, now, filename)
         )
         report_id = existing["id"]
     else:
         cur = conn.execute(
-            "INSERT INTO reports (filename, date, lines, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (filename, date, lines, content, now, now)
+            "INSERT INTO reports (filename, date, lines, format_version, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (filename, date, lines, format_version, content, now, now)
         )
         report_id = cur.lastrowid
     conn.commit()
@@ -256,9 +262,9 @@ def import_db_json(import_path: Path) -> dict:
     for r in data.get("reports", []):
         try:
             conn.execute(
-                """INSERT OR REPLACE INTO reports (filename, date, lines, content, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (r["filename"], r.get("date", ""), r.get("lines", ""),
+                """INSERT OR REPLACE INTO reports (filename, date, lines, format_version, content, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (r["filename"], r.get("date", ""), r.get("lines", ""), r.get("format_version", "v1"),
                  r.get("content", ""), r.get("created_at", ""), r.get("updated_at", ""))
             )
             imported_reports += 1
