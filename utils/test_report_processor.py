@@ -2,6 +2,7 @@ import re
 import pandas as pd
 from pathlib import Path
 from utils import report_db
+from utils.test_report_format import REPORT_CATEGORIES, FIELD_LABELS, split_line_names
 
 
 class TestReportProcessor:
@@ -9,7 +10,7 @@ class TestReportProcessor:
 
     REPORT_DIR = Path("report")
 
-    CATEGORIES = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"]
+    CATEGORIES = REPORT_CATEGORIES
     KNOWN_LINES = ["VCP1", "VCP2", "PLB"]
 
     def __init__(self, report_dir=None):
@@ -25,17 +26,17 @@ class TestReportProcessor:
             "文件名": file_path.name,
             "日期": self._extract_date(content, file_path.name),
             "线体": line_text,
-            "线体列表": self.split_line_names(line_text),
-            "今日计划": self._extract_field(content, "今日计划"),
-            "测试总时长": self._extract_field(content, "测试总时长"),
-            "实际场景": self._extract_field(content, "实际场景"),
-            "工单": self._extract_field(content, "工单"),
-            "流程": self._extract_field(content, "流程"),
-            "问题汇总": self._extract_field(content, "问题汇总"),
-            "待办项": self._extract_field(content, "待办项"),
-            "测试结果": self._extract_field(content, "测试结果"),
-            "计划完成情况": self._extract_field(content, "今日计划实际是否完成"),
-            "明日计划": self._extract_field(content, "明日计划"),
+            "线体列表": split_line_names(line_text),
+            "今日计划": self._extract_field(content, FIELD_LABELS["today_plan"]),
+            "测试总时长": self._extract_field(content, FIELD_LABELS["duration"]),
+            "实际场景": self._extract_field(content, FIELD_LABELS["actual_scene"]),
+            "工单": self._extract_field(content, FIELD_LABELS["work_order"]),
+            "流程": self._extract_field(content, FIELD_LABELS["process"]),
+            "问题汇总": self._extract_field(content, FIELD_LABELS["problem_summary"]),
+            "待办项": self._extract_field(content, FIELD_LABELS["todo"]),
+            "测试结果": self._extract_field(content, FIELD_LABELS["test_result"]),
+            "计划完成情况": self._extract_field(content, FIELD_LABELS["completion"]),
+            "明日计划": self._extract_field(content, FIELD_LABELS["tomorrow_plan"]),
             "需要协调事项": self._extract_coordination(content),
         }
 
@@ -62,17 +63,6 @@ class TestReportProcessor:
                 lines.append(line)
         return ", ".join(lines) if lines else "其他"
 
-    def split_line_names(self, line_text: str) -> list:
-        """拆分逗号分隔的线体文本"""
-        if not line_text:
-            return []
-        parts = [part.strip() for part in str(line_text).split(",") if part.strip()]
-        unique_parts = []
-        for part in parts:
-            if part not in unique_parts:
-                unique_parts.append(part)
-        return unique_parts
-
     def _extract_field(self, content: str, field_name: str) -> str:
         """提取字段内容"""
         pattern = rf"【{field_name}】([\s\S]*?)(?=【|$)"
@@ -84,7 +74,7 @@ class TestReportProcessor:
 
     def _extract_coordination(self, content: str) -> str:
         """提取需要协调事项"""
-        tomorrow_plan = self._extract_field(content, "明日计划")
+        tomorrow_plan = self._extract_field(content, FIELD_LABELS["tomorrow_plan"])
         match = re.search(r"需要协调事项[:：](.+)", tomorrow_plan)
         if match:
             return match.group(1).strip()
@@ -218,7 +208,7 @@ class TestReportProcessor:
             "需要协调事项": self._extract_coordination(content),
         }
 
-        result["线体列表"] = self.split_line_names(result.get("线体", ""))
+        result["线体列表"] = split_line_names(result.get("线体", ""))
         result["问题列表"] = self._extract_problems_new(content, result.get("线体", ""))
 
         date_match = re.search(r"【日期】(\d{4}-\d{2}-\d{2})", content)

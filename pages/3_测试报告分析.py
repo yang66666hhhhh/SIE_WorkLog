@@ -6,6 +6,7 @@ from pathlib import Path
 from utils import report_db
 from utils.test_report_processor import TestReportProcessor
 from utils.report_form import render_report_form
+from utils.test_report_format import REPORT_PROBLEM_MODULES, NUMBERED_MARKERS, split_line_names
 from utils.styles import (
     inject_global_css, render_kpi_card, render_section_title,
     render_empty_state, render_top_nav, render_problem_card,
@@ -50,10 +51,7 @@ def build_daily_stats_cached(problem_df):
     return build_daily_stats(problem_df)
 
 
-PROBLEM_MODULES = [
-    "投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）",
-    "生产/工艺", "生产", "工艺", "维护", "IT", "其他",
-]
+PROBLEM_MODULES = REPORT_PROBLEM_MODULES
 
 
 def normalize_problem_summary(summary):
@@ -63,7 +61,7 @@ def normalize_problem_summary(summary):
     for module in PROBLEM_MODULES:
         text = text.replace(f" · {module}：", f"\n{module}：")
         text = text.replace(f" · {module}:", f"\n{module}:")
-    for marker in ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]:
+    for marker in NUMBERED_MARKERS:
         text = text.replace(f" · {marker}", f"\n{marker}")
     return text
 
@@ -118,17 +116,6 @@ def has_text(value):
     if value is None or pd.isna(value):
         return False
     return bool(str(value).strip())
-
-
-def split_line_names(value):
-    if not has_text(value):
-        return []
-    parts = [part.strip() for part in str(value).split(",") if part.strip()]
-    unique_parts = []
-    for part in parts:
-        if part not in unique_parts:
-            unique_parts.append(part)
-    return unique_parts
 
 
 def collect_line_options(values):

@@ -5,12 +5,18 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
-CATEGORIES = ["投收板机", "自动化物流（海康）", "主线设备", "软件集成（SIE）", "生产/工艺", "生产", "工艺", "维护", "IT"]
 from utils.config import Config
 from utils import report_db
+from utils.test_report_format import (
+    REPORT_CATEGORIES,
+    NUMBERED_MARKERS,
+    split_report_block_items,
+    parse_problem_summary_to_map,
+)
 _config = Config()
 LINE_OPTIONS = list(_config.load_equipment().keys())
 REPORT_DIR = Path("report")
+CATEGORIES = REPORT_CATEGORIES
 
 
 def parse_report_to_form(report_data):
@@ -34,53 +40,23 @@ def parse_report_to_form(report_data):
 
     today_plan = report_data.get("今日计划", "")
     if today_plan:
-        lines = today_plan.split("\n")
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > 2 and (line.startswith("①") or line.startswith("②") or line.startswith("③")):
-                form_data["today_plans"].append(line[2:].strip())
-            elif line:
-                form_data["today_plans"].append(line)
+        form_data["today_plans"] = split_report_block_items(today_plan)
 
     actual_scene = report_data.get("实际场景", "")
     if actual_scene:
-        lines = actual_scene.split("\n")
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > 2 and (line.startswith("①") or line.startswith("②") or line.startswith("③")):
-                form_data["actual_scenes"].append(line[2:].strip())
-            elif line:
-                form_data["actual_scenes"].append(line)
+        form_data["actual_scenes"] = split_report_block_items(actual_scene)
 
     process_flow = report_data.get("流程", "")
     if process_flow:
-        lines = process_flow.split("\n")
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > 2 and (line.startswith("①") or line.startswith("②") or line.startswith("③")):
-                form_data["processes"].append(line[2:].strip())
-            elif line:
-                form_data["processes"].append(line)
+        form_data["processes"] = split_report_block_items(process_flow)
 
     test_results = report_data.get("测试结果", "")
     if test_results:
-        lines = test_results.split("\n")
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > 2 and (line.startswith("①") or line.startswith("②") or line.startswith("③")):
-                form_data["test_results"].append(line[2:].strip())
-            elif line:
-                form_data["test_results"].append(line)
+        form_data["test_results"] = split_report_block_items(test_results)
 
     completions = report_data.get("计划完成情况", "")
     if completions:
-        lines = completions.split("\n")
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > 2 and (line.startswith("①") or line.startswith("②") or line.startswith("③")):
-                form_data["completions"].append(line[2:].strip())
-            elif line:
-                form_data["completions"].append(line)
+        form_data["completions"] = split_report_block_items(completions)
 
     tomorrow_plan = report_data.get("明日计划", "")
     if tomorrow_plan:
@@ -91,7 +67,7 @@ def parse_report_to_form(report_data):
                 form_data["next_plan_scene"] = line[5:].strip()
             elif line.startswith("明细流程："):
                 continue
-            elif line and len(line) > 2 and (line.startswith("①") or line.startswith("②") or line.startswith("③")):
+            elif line and len(line) > 2 and line.startswith(NUMBERED_MARKERS):
                 form_data["next_plan_processes"].append(line[2:].strip())
             elif "需要协调事项：" in line:
                 form_data["coordination"] = line.split("需要协调事项：")[1].strip()
@@ -106,33 +82,7 @@ def parse_report_to_form(report_data):
 
     problem_summary = report_data.get("问题汇总", "")
     if problem_summary:
-        lines = problem_summary.split("\n")
-        current_cat = None
-        pending_lines = []
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            cat_match = re.match(r"^([^：：]+)[：:]\s*(.*)$", stripped)
-            if cat_match:
-                cat_name = cat_match.group(1).strip()
-                text = cat_match.group(2).strip()
-                if cat_name in CATEGORIES:
-                    if current_cat and pending_lines and form_data["problems"].get(current_cat, "") == "":
-                        combined = "\n".join(pending_lines).strip()
-                        if combined and combined != "无":
-                            form_data["problems"][current_cat] = combined
-                    current_cat = cat_name
-                    pending_lines = [text] if text and text != "无" else []
-                    continue
-            if current_cat and stripped not in ("无", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"):
-                if stripped.startswith(("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩")):
-                    stripped = stripped[2:].strip()
-                pending_lines.append(stripped)
-        if current_cat and pending_lines and form_data["problems"].get(current_cat, "") == "":
-            combined = "\n".join(pending_lines).strip()
-            if combined and combined != "无":
-                form_data["problems"][current_cat] = combined
+        form_data["problems"] = parse_problem_summary_to_map(problem_summary, CATEGORIES)
 
     return form_data
 
